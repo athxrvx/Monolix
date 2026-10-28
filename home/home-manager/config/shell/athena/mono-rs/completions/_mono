@@ -1,0 +1,41 @@
+#compdef mono
+
+_mono() {
+  local -a commands profiles
+  commands=(
+    'sync:Build and activate system and Home Manager' 'switch:Build and activate system' 'home:Build and activate Home Manager'
+    'build:Build without activating' 'test:Temporarily activate' 'boot:Activate on next boot' 'check:Evaluate the flake'
+    'status:Show current generations' 'generations:List generations' 'jump:Switch Home Manager generation'
+    'profile:List profiles' 'info:Show setup info' 'doctor:Check setup' 'path:Print flake directory'
+    'pull:Update flake inputs' 'update:Update flake inputs' 'style:Show or switch Stylix color style' 'clean:Clean Home Manager generations'
+    'system:Manage system generations' 'gc:Collect garbage' 'shell:Manage Monolix' 'edit:Edit a config file'
+    'search:Search Nixpkgs' 'run:Run a package once' 'try:Open a temporary package shell' 'fhs:Run inside an FHS environment'
+    'menu:Open the interactive command picker' 'completions:Print shell completions' 'help:Show help'
+  )
+  profiles=(athena 'athena-xmonad')
+  if (( CURRENT == 2 )) && [[ ${words[CURRENT]} == -* ]]; then
+    _values 'global option' --dry-run --verbose --no-color --flake --profile --help
+  elif (( CURRENT == 2 )); then
+    _describe -t commands 'mono command' commands
+  elif [[ ${words[2]} == --profile || ${words[2]} == -p ]]; then
+    _describe -t profiles 'profile' profiles
+  elif [[ ${words[2]} == sync || ${words[2]} == switch || ${words[2]} == home || ${words[2]} == build || ${words[2]} == test || ${words[2]} == boot || ${words[2]} == check ]]; then
+    _describe -t profiles 'profile' profiles
+  elif [[ ${words[2]} == generations ]]; then
+    _values 'generation type' system home all
+  elif [[ ${words[2]} == jump ]]; then
+    _values 'jump option' --pick
+  elif [[ ${words[2]} == style ]]; then
+    _values 'style' jellybeans aofuji nothing oled yoru
+  elif [[ ${words[2]} == shell ]]; then
+    _values 'shell action' status restart logs
+  elif [[ ${words[2]} == system && ${CURRENT} == 3 ]]; then
+    _values 'system action' clean
+  elif [[ ${words[2]} == completions ]]; then
+    _values 'shell' zsh fish
+  elif [[ ${words[2]} == clean || ${words[2]} == gc ]]; then
+    _values 'option' --keep --system
+  fi
+}
+
+_mono "$@"
