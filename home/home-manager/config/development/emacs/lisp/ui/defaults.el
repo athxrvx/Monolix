@@ -70,10 +70,8 @@
 ;; No toolbar
 (if (fboundp 'tool-bar-mode) (tool-bar-mode -1))
 
-;; No menu bar
-(if (display-graphic-p)
-    (menu-bar-mode t) ;; When nil, focus problem on OSX
-  (menu-bar-mode -1))
+;; No menu bar (disabled everywhere — use keybindings)
+(menu-bar-mode -1)
 
 ;; Tab behavior
 ;; (setq tab-always-indent 'complete)

@@ -208,59 +208,6 @@
 (defvar boba-toolbar--active nil
   "Non-nil when context toolbar is active.")
 
-(define-minor-mode boba-modeline-buttons-mode
-  "Minor mode to show Options/File Tree/Sidebar buttons in all buffers."
-  :global t
-  :lighter " Boba"
-  (if boba-modeline-buttons-mode
-      (setq header-line-format
-            `(:eval (boba-modeline--buttons-format)))
-    (when (eq header-line-format
-              `(:eval (boba-modeline--buttons-format)))
-      (setq header-line-format nil))))
-
-(defun boba-modeline--buttons-format ()
-  "Return header-line format with global buttons."
-  (let* ((btn-face '(:inherit modeline-active :weight bold))
-         (options-btn (propertize
-                       " Options "
-                       'face btn-face
-                       'keymap (let ((m (make-sparse-keymap)))
-                                 (define-key m [header-line mouse-1]
-                                   (lambda (_e) (interactive "e") (boba-toolbar-toggle)))
-                                 (define-key m [header-line mouse-2]
-                                   (lambda (_e) (interactive "e") (boba-toolbar-toggle)))
-                                 m)
-                       'mouse-face 'dashboard-modeline-button-hover-face
-                       'help-echo "Toggle context toolbar"))
-         (files-btn (propertize
-                     " File Tree "
-                     'face btn-face
-                     'keymap (let ((m (make-sparse-keymap)))
-                               (define-key m [header-line mouse-1]
-                                 (lambda (_e) (interactive "e") (neotree-toggle)))
-                               (define-key m [header-line mouse-2]
-                                 (lambda (_e) (interactive "e") (neotree-toggle)))
-                               m)
-                     'mouse-face 'dashboard-modeline-button-hover-face
-                     'help-echo "Toggle file tree"))
-         (sidebar-btn (propertize
-                       " Sidebar "
-                       'face btn-face
-                       'keymap (let ((m (make-sparse-keymap)))
-                                 (define-key m [header-line mouse-1]
-                                   (lambda (_e) (interactive "e") (dashboard-sidebar-toggle)))
-                                 (define-key m [header-line mouse-2]
-                                   (lambda (_e) (interactive "e") (dashboard-sidebar-toggle)))
-                                 m)
-                       'mouse-face 'dashboard-modeline-button-hover-face
-                       'help-echo "Toggle sidebar"))
-         (separator "  "))
-    (concat "  " options-btn separator files-btn separator sidebar-btn)))
-
-;; Buttons mode is intentionally disabled — header buttons removed per design
-;; (boba-modeline-buttons-mode 1)
-
 (defvar boba-toolbar--active nil
   "Non-nil when context toolbar is active.")
 
@@ -324,44 +271,7 @@
   (setq boba-toolbar--active nil)
   (force-mode-line-update))
 
-(defun modeline-dashboard-buttons ()
-  "Modeline element: right-aligned dashboard action buttons.
-Referenced by `modeline-dashboard-mode' in modeline.el."
-  (let* ((btn-face '(:inherit modeline-active :weight bold))
-         (options-btn (propertize
-                       " Options "
-                       'face btn-face
-                       'keymap (let ((m (make-sparse-keymap)))
-                                 (define-key m [header-line mouse-1]
-                                   (lambda (_e) (interactive "e") (boba-toolbar-toggle)))
-                                 (define-key m [header-line mouse-2]
-                                   (lambda (_e) (interactive "e") (boba-toolbar-toggle)))
-                                 m)
-                       'mouse-face 'dashboard-modeline-button-hover-face
-                       'help-echo "Toggle context toolbar"))
-         (files-btn (propertize
-                     " File Tree "
-                     'face btn-face
-                     'keymap (let ((m (make-sparse-keymap)))
-                               (define-key m [header-line mouse-1]
-                                 (lambda (_e) (interactive "e") (neotree-toggle)))
-                               (define-key m [header-line mouse-2]
-                                 (lambda (_e) (interactive "e") (neotree-toggle)))
-                               m)
-                     'mouse-face 'dashboard-modeline-button-hover-face
-                     'help-echo "Toggle file tree"))
-         (sidebar-btn (propertize
-                       " Sidebar "
-                       'face btn-face
-                       'keymap (let ((m (make-sparse-keymap)))
-                                 (define-key m [header-line mouse-1]
-                                   (lambda (_e) (interactive "e") (dashboard-sidebar-toggle)))
-                                 (define-key m [header-line mouse-2]
-                                   (lambda (_e) (interactive "e") (dashboard-sidebar-toggle)))
-                                 m)
-                       'mouse-face 'dashboard-modeline-button-hover-face
-                       'help-echo "Toggle sidebar")))
-    (concat "  " options-btn "  " files-btn "  " sidebar-btn)))
+
 
 (define-derived-mode dashboard-mode special-mode "Dashboard"
   "Major mode for the Bobamacs graphical dashboard."

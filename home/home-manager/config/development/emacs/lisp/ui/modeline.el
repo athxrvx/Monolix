@@ -358,44 +358,6 @@ other button states."
             (plist-put button :state 'active))))))))
   (force-mode-line-update))
 
-(defun modeline-boba-buttons ()
-  "Return modeline element for Bobamacs global buttons."
-  (let* ((btn-face '(:inherit modeline-active :weight bold))
-         (options-btn (propertize
-                       " Options "
-                       'face btn-face
-                       'keymap (let ((m (make-sparse-keymap)))
-                                 (define-key m [header-line mouse-1]
-                                   (lambda (_e) (interactive "e") (boba-toolbar-toggle)))
-                                 (define-key m [header-line mouse-2]
-                                   (lambda (_e) (interactive "e") (boba-toolbar-toggle)))
-                                 m)
-                       'mouse-face 'dashboard-modeline-button-hover-face
-                       'help-echo "Toggle context toolbar"))
-         (files-btn (propertize
-                     " File Tree "
-                     'face btn-face
-                     'keymap (let ((m (make-sparse-keymap)))
-                               (define-key m [header-line mouse-1]
-                                 (lambda (_e) (interactive "e") (neotree-toggle)))
-                               (define-key m [header-line mouse-2]
-                                 (lambda (_e) (interactive "e") (neotree-toggle)))
-                               m)
-                     'mouse-face 'dashboard-modeline-button-hover-face
-                     'help-echo "Toggle file tree"))
-         (sidebar-btn (propertize
-                       " Sidebar "
-                       'face btn-face
-                       'keymap (let ((m (make-sparse-keymap)))
-                                 (define-key m [header-line mouse-1]
-                                   (lambda (_e) (interactive "e") (dashboard-sidebar-toggle)))
-                                 (define-key m [header-line mouse-2]
-                                   (lambda (_e) (interactive "e") (dashboard-sidebar-toggle)))
-                                 m)
-                       'mouse-face 'dashboard-modeline-button-hover-face
-                       'help-echo "Toggle sidebar"))
-         (separator "  "))
-    (concat "  " options-btn "  " files-btn "  " sidebar-btn)))
 
 (defun modeline-header (left &optional right default)
   "Install a header line made of LEFT and RIGHT parts. Line can be
@@ -1058,7 +1020,7 @@ common action"
     (funcall modeline-position
              `((modeline-buffer-status ,status-tag) " "
                (modeline-buffer-name "Bobamacs"))
-             '((modeline-dashboard-buttons)))))
+             nil)))
 
 ;; Enable modeline hooks
 (add-hook 'prog-mode-hook            #'modeline-prog-mode)
