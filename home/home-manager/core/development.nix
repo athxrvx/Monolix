@@ -5,8 +5,7 @@
     git
     wget
     unzip
-    # Editors and language toolchains already used by this setup.
-    emacs-pgtk
+    # CLI toolchains and editors used by this setup.
     gcc
     gnumake
     pkg-config
@@ -20,15 +19,8 @@
     bat
     tokei
 
-    # Android and Flutter. Android Studio manages the licensed SDK components
-    # through its SDK Manager; no Android SDK license is accepted implicitly.
-    android-studio
-    android-tools
-    flutter
-    jdk17
-    gradle
-    jdt-language-server
-    kotlin-language-server
+    # Language servers and build tools. Heavyweight GUI IDEs and the
+    # Android/Java/Flutter stack are intentionally not installed.
     nixd
     python3Packages.python-lsp-server
     rust-analyzer
@@ -40,22 +32,10 @@
     jq
     cmake
     ninja
-    vscode
-
-    # Containerization
-    podman
-    distrobox
-
   ];
 
   imports = [
-      ../config/development/zed.nix
-      ../config/development/opencode.nix
+    ../config/development/opencode.nix
+    ../config/development/emacs.nix
   ];
-
-  home.sessionVariables = {
-    ANDROID_HOME = "$HOME/Android/Sdk";
-    ANDROID_SDK_ROOT = "$HOME/Android/Sdk";
-    JAVA_HOME = "${pkgs.jdk17}";
-  };
 }

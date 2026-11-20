@@ -1,0 +1,13 @@
+.elpa/
+elpa/
+straight/
+
+# Native compilation cache
+eln-cache/
+
+# Optional
+auto-save-list/
+eshell/
+recentf
+bookmarks
+transient/

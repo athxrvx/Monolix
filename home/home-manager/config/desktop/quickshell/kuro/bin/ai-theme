@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $# == 1 ]] || { echo 'Usage: ai-theme <theme-id>' >&2; exit 2; }
+name=$1
+[[ $name =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Invalid theme id' >&2; exit 2; }
+file="$HOME/.config/kuro/themes/$name.toml"
+[[ -f "$file" ]] || { echo "Unknown theme: $name" >&2; exit 1; }
+exec "$HOME/.config/quickshell/shell/bin/kurogen" set theme.scheme "$name"

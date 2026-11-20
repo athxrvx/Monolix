@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Launcher "Create a container" flow. Keeps the name prompt, but replaces the
+# free-form image prompt with an fzf menu of common distros. Images are fully
+# qualified so podman never depends on short-name resolution.
+
+set -u
+
+finder="${FZPAC_FINDER:-}"
+if [[ -z "$finder" ]] || ! command -v "$finder" >/dev/null 2>&1; then
+    if command -v fzf >/dev/null 2>&1; then
+        finder="fzf"
+    elif [[ -x "$HOME/.local/bin/fzf" ]]; then
+        finder="$HOME/.local/bin/fzf"
+    else
+        echo "fzf is required to choose a base image." >&2
+        exit 1
+    fi
+fi
+
+read -rp 'Name [developer]: ' name
+name="${name:-developer}"
+
+choice=$(
+    printf '%s\n' \
+        'Ubuntu' \
+        'Fedora' \
+        'Arch Linux' \
+        'Gentoo' \
+        'Alpine' \
+        | "$finder" --prompt 'Image> ' --header 'Choose a base image'
+) || exit 0
+
+case "$choice" in
+    "Ubuntu")     image='docker.io/library/ubuntu:latest' ;;
+    "Fedora")     image='registry.fedoraproject.org/fedora:latest' ;;
+    "Arch Linux") image='docker.io/library/archlinux:latest' ;;
+    "Gentoo")     image='docker.io/library/gentoo:latest' ;;
+    "Alpine")     image='docker.io/library/alpine:latest' ;;
+    *)
+        echo "Unknown selection: $choice" >&2
+        exit 1
+        ;;
+esac
+
+distrobox create --name "$name" --image "$image"

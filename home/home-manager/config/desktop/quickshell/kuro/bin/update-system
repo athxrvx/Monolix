@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Rebuild and activate the full NixOS system plus Home Manager.
+set -uo pipefail
+
+export KURO_FLAKE="${KURO_FLAKE:-$HOME/.config/nixconfig}"
+kuro sync
+status=$?
+printf '\nUpdate system exited with status %s. Press Enter to close.' "$status"
+read -r _
+exit "$status"

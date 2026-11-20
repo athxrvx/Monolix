@@ -1,5 +1,5 @@
 {
-  description = "NixOS Incandescent";
+  description = "Kuro NixOS";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
@@ -12,57 +12,38 @@
       url = "github:nix-community/lanzaboote/v1.2.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    stylix = {
-      url = "github:nix-community/stylix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    boba = {
-      url = "github:athxrvx/boba/0e519ae673c760ca9f278d8690367c3a4be1c732";
-      flake = false;
-    };
   };
 
-  outputs = { self, nixpkgs, home-manager, lanzaboote, stylix, nix-flatpak, ... }@inputs:
+  outputs = { self, nixpkgs, home-manager, lanzaboote, nix-flatpak, ... }:
   let
     system = "x86_64-linux";
     lib = nixpkgs.lib;
-    mkAthena = { desktopModule, homeProfile }:
-      lib.nixosSystem {
+  in {
+    nixosConfigurations = {
+      athena = lib.nixosSystem {
         inherit system;
         modules = [
           ./config.nix
           home-manager.nixosModules.home-manager
-          lanzaboote.nixosModules.lanzaboote
-          stylix.nixosModules.stylix
-          ./modules/boot/secureboot.nix
-          desktopModule
+          # lanzaboote.nixosModules.lanzaboote
+          # ./modules/boot/secureboot.nix
+          ./modules/desktop/hyprland.nix
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             # Preserve existing user files when Home Manager first takes
             # ownership of them (including the current mimeapps.list).
             home-manager.backupFileExtension = "backup";
-            home-manager.extraSpecialArgs = { inherit (inputs) boba; };
             home-manager.users.atharva = {
               imports = [
                 ./home/home-manager
-                homeProfile
+                ./home/home-manager/profiles/hyprland.nix
                 nix-flatpak.homeManagerModules.nix-flatpak
               ];
               home.stateVersion = "26.05";
             };
           }
         ];
-      };
-  in {
-    nixosConfigurations = {
-      athena = mkAthena {
-        desktopModule = ./modules/desktop/niri.nix;
-        homeProfile = ./home/home-manager/profiles/niri.nix;
-      };
-      athena-xmonad = mkAthena {
-        desktopModule = ./modules/desktop/xmonad.nix;
-        homeProfile = ./home/home-manager/profiles/xmonad.nix;
       };
     };
   };

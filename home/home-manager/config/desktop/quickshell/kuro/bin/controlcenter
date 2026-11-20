@@ -1,0 +1,49 @@
+#!/bin/sh
+# Toggle the Quickshell Control Center based on the actual state in Hyprland.
+#
+#   controlcenter              toggle
+#   controlcenter open sound   open a specific page
+#   controlcenter start        only start Quickshell (for exec-once)
+#
+# Save to ~/.local/bin/controlcenter then: chmod +x ~/.local/bin/controlcenter
+# Log: ~/.cache/controlcenter.log
+
+CFG="${QS_CONFIG:-$HOME/.config/quickshell/shell}"
+TITLE="Control Center"
+LOG="$HOME/.cache/controlcenter.log"
+
+exec 2>>"$LOG"
+echo "[$(date +%T)] controlcenter $*" >&2
+
+[ $# -eq 0 ] && set -- toggle
+
+call()    { quickshell -p "$CFG" ipc call controlcenter "$@" >/dev/null; }
+running() { quickshell -p "$CFG" ipc show >/dev/null 2>&1; }   # check without changing anything
+active()  { hyprctl activewindow 2>/dev/null | grep -qx "[[:space:]]*title: $TITLE"; }
+
+# 1. Make sure Quickshell is running (without showing a window)
+if ! running; then
+    echo "  quickshell not running, starting" >&2
+    setsid -f quickshell -p "$CFG" >/dev/null 2>&1 </dev/null
+    i=0
+    until running; do
+        i=$((i + 1))
+        [ $i -gt 20 ] && { notify-send "Control Center" "Quickshell failed to start, see $LOG"; exit 1; }
+        sleep 0.25
+    done
+fi
+
+[ "$1" = start ] && exit 0
+
+# 2. Action
+if [ "$1" = toggle ]; then
+    if active; then
+        call hide
+    else
+        # hidden / on another workspace / stale state -> show it on this workspace
+        call hide; sleep 0.1; call show
+    fi
+else
+    active || { call hide; sleep 0.1; }
+    call "$@"
+fi

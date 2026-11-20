@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Refresh flake inputs, but only once every 10 days.
+set -uo pipefail
+
+DAYS=10
+export KURO_FLAKE="${KURO_FLAKE:-$HOME/.config/nixconfig}"
+STAMP_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/kuro"
+STAMP="$STAMP_DIR/flake-last-update"
+mkdir -p "$STAMP_DIR"
+
+pause() {
+    printf '\nPress Enter to close.'
+    read -r _
+}
+
+now=$(date +%s)
+if [[ -f "$STAMP" ]]; then
+    last=$(cat "$STAMP" 2>/dev/null || echo 0)
+    [[ "$last" =~ ^[0-9]+$ ]] || last=0
+    elapsed=$(( (now - last) / 86400 ))
+    if (( last > 0 && elapsed < DAYS )); then
+        echo "Flake inputs were updated $elapsed day(s) ago; skipping (minimum $DAYS days)."
+        echo "Last update: $(date -d "@$last" '+%Y-%m-%d %H:%M' 2>/dev/null || echo unknown)"
+        pause
+        exit 0
+    fi
+fi
+
+echo "Updating flake inputs..."
+if kuro update; then
+    printf '%s\n' "$now" > "$STAMP"
+    echo "Flake inputs updated; timestamp recorded."
+    pause
+    exit 0
+else
+    status=$?
+    echo "Flake update failed with status $status; timestamp not changed." >&2
+    pause
+    exit "$status"
+fi

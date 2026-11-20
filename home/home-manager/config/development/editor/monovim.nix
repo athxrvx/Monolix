@@ -1,6 +1,8 @@
-{ pkgs, lib, config, ... }:
+{ pkgs, lib, ... }:
 let
-  colors = config.lib.stylix.colors;
+  # Static fallback from Kuro's bundled jellybeans theme. The active editor
+  # palette can still be overridden by Kuro-generated runtime colors.
+  colors = import ../../desktop/kuro/kuro-colors.nix;
   colorNames = [
     "base00" "base01" "base02" "base03"
     "base04" "base05" "base06" "base07"

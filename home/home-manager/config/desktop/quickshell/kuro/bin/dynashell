@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Persistent imperative package environment.
+# The package list lives in ~/.local/state/dynashell/packages and is edited by
+# dynashell-add / dynashell-remove. Nothing here is owned by Home Manager, so
+# edits survive rebuilds.
+set -uo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dynashell"
+PACKAGES="$STATE_DIR/packages"
+
+mkdir -p "$STATE_DIR"
+touch "$PACKAGES"
+
+mapfile -t pkgs < <(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$PACKAGES" | grep -vE '^(#|$)')
+
+specs=()
+for p in "${pkgs[@]}"; do
+    if [[ "$p" == *"#"* ]]; then
+        specs+=("$p")
+    else
+        specs+=("nixpkgs#$p")
+    fi
+done
+
+shell="${SHELL:-}"
+if [[ -z "$shell" ]] || ! command -v "$shell" >/dev/null 2>&1; then
+    shell="zsh"
+fi
+
+# Let the Kuro zsh theme mark this shell as the imperative environment.
+export KURO_DYNASHELL=1
+
+echo "dynashell: ${#specs[@]} package(s) from $PACKAGES"
+exec nix shell "${specs[@]}" --command "$shell" -i

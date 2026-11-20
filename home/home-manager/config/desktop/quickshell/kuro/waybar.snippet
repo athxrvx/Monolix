@@ -1,0 +1,37 @@
+// ── ~/.config/waybar/config.jsonc ────────────────────────────────
+// 1. Add "custom/control" to modules-right (or modules-left/center):
+//      "modules-right": ["pulseaudio", "network", "battery", "clock", "custom/control"],
+//
+// 2. Module definition:
+"custom/control": {
+    "format": "󰒓",
+    "tooltip-format": "Control Center",
+    "on-click": "~/.local/bin/controlcenter",
+    "on-click-right": "~/.local/bin/controlcenter open network",
+    "on-click-middle": "~/.local/bin/controlcenter open wallpaper"
+},
+
+// Optional: make Waybar's built-in modules open the matching pages too
+"network":    { "on-click": "~/.local/bin/controlcenter open network" },
+"pulseaudio": { "on-click": "~/.local/bin/controlcenter open sound" },
+"battery":    { "on-click": "~/.local/bin/controlcenter open power" },
+"bluetooth":  { "on-click": "~/.local/bin/controlcenter open bluetooth" }
+
+
+/* ── ~/.config/waybar/style.css ─────────────────────────────────
+   Colors from pywal to match the Control Center.
+   The @import line must be at the very top of the file. */
+
+@import "../../.cache/wal/colors-waybar.css";
+
+#custom-control {
+    padding: 0 12px;
+    margin: 4px 4px;
+    border-radius: 6px;
+    color: @foreground;
+    font-size: 15px;
+}
+
+#custom-control:hover {
+    background: alpha(@foreground, 0.12);
+}

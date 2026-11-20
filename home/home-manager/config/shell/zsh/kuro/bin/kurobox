@@ -1,0 +1,13 @@
+#!/usr/bin/env zsh
+# List configured Distroboxes, or enter the named box.
+
+if ! (( $+commands[distrobox] )); then
+  print -u2 -- 'kurobox: distrobox is not installed or is not on PATH'
+  exit 127
+fi
+
+if (( $# == 0 )); then
+  exec distrobox list
+fi
+
+exec distrobox enter -- "$@"

@@ -1,6 +1,8 @@
-{ config, ... }:
+{ ... }:
 let
-  colors = config.lib.stylix.colors.withHashtag;
+  # Static fallback from Kuro's bundled jellybeans theme; the active palette
+  # still comes from ~/.config/kuro/kuro.toml for programs that can read it.
+  colors = import ../../desktop/kuro/kuro-colors.nix;
 in
 {
   programs.tmux = {
@@ -30,7 +32,7 @@ in
       bind -r h select-pane -L
       bind -r l select-pane -R
 
-      # Compact Yoru status bar, using the same Stylix colors as Kitty.
+      # Kuro jellybeans status bar.
       set -g status on
       set -g status-position bottom
       set -g status-interval 5

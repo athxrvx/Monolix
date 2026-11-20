@@ -1,0 +1,33 @@
+# ── Quickshell Control Center ─────────────────────────────────────
+# Paste into ~/.config/hypr/hyprland.conf
+
+exec-once = awww-daemon   # skip if already started by your wallpaper setup
+exec-once = ~/.local/bin/controlcenter start
+bind = SUPER, A, exec, ~/.local/bin/controlcenter
+bind = SUPER, V, exec, ~/.local/bin/controlcenter open clipboard
+bind = SUPER, TAB, exec, qs -c shell ipc call overview toggle
+bind = SUPER, N, exec, qs -c shell ipc call notifications toggle
+
+# Blur the overview background
+layerrule = blur, quickshell-overview
+layerrule = ignorezero, quickshell-overview
+
+# Notifications are handled by Quickshell: REMOVE exec-once = swaync (and mako/dunst)
+
+# Clipboard history (Clipboard page)
+exec-once = wl-paste --type text  --watch cliphist store
+exec-once = wl-paste --type image --watch cliphist store
+
+# Floating window in the center, not tiled (Hyprland 0.48 – 0.52 syntax)
+windowrule = float, title:^(Control Center)$
+windowrule = center, title:^(Control Center)$
+# Follow to all workspaces, so toggling doesn't "close" an unseen window
+windowrule = pin, title:^(Control Center)$
+
+# Values from the Appearance page (gaps, border, rounding, blur, animations).
+# Put this LAST so it overrides the values above.
+source = ~/.config/hypr/quickshell.conf
+
+# Optional: blur behind notification popups
+# layerrule = blur, quickshell-notifications
+# layerrule = ignorezero, quickshell-notifications

@@ -1,0 +1,13 @@
+complete -c kuro -f
+complete -c kuro -n '__fish_use_subcommand' -a 'sync switch s home build b test boot check status generations jump profile pr info doctor path pull update clean system gc edit search run try fhs menu completions help' -d 'Kuro command'
+complete -c kuro -n '__fish_seen_subcommand_from sync switch s home build b test boot check' -a 'athena' -d 'System profile'
+complete -c kuro -n '__fish_seen_subcommand_from generations' -a 'system home all' -d 'Generation type'
+complete -c kuro -n '__fish_seen_subcommand_from jump' -a '--pick' -d 'Choose generation with fzf'
+complete -c kuro -n '__fish_seen_subcommand_from completions' -a 'zsh fish' -d 'Shell'
+complete -c kuro -n '__fish_seen_subcommand_from clean' -l system -d 'Clean system generations'
+complete -c kuro -n '__fish_seen_subcommand_from clean' -l keep -d 'Keep this many newest generations'
+complete -c kuro -s n -l dry-run -d 'Print commands without running them'
+complete -c kuro -s f -l flake -d 'Flake directory'
+complete -c kuro -s p -l profile -a 'athena' -d 'System profile'
+complete -c kuro -s v -l verbose -d 'Show commands as they run'
+complete -c kuro -l no-color -d 'Disable colored output'

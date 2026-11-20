@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -uo pipefail
+[[ $# == 0 ]] || { echo 'This script takes no arguments' >&2; exit 2; }
+sudo pacman -Syu
+status=$?
+printf '\nSystem update exited with status %s. Press Enter to close.' "$status"
+read -r _
+exit "$status"

@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────
+# Kuro — central settings for the whole desktop.
+#
+# This file owns the active theme setting and desktop look. Hyprland, kitty
+# and the Quickshell shell derive their colors, fonts and visual settings
+# from here. Theme definitions are managed by Nix in home/home-manager/theme/
+# colors and installed to ~/.config/kuro/themes; the active choice is set
+# with `kurogen set theme.scheme <name>`.
+#
+#   Edit this file, then run:   kurogen
+#   List themes:                kurogen themes
+#   Switch theme:               kurogen set theme.scheme gruvbox-dark
+#
+# The shell watches this file, so changes are also applied automatically
+# (regenerated configs + Hyprland reload + kitty reload).
+# ─────────────────────────────────────────────────────────────────────
+
+[theme]
+# Active colorscheme: the id of a [themes.<id>] table below.
+scheme = "jellybeans"
+
+# Hyprland window look
+rounding = 0
+gaps_in = 4
+gaps_out = 8
+border_size = 2
+blur = false
+animations = true
+active_opacity = 1.0
+inactive_opacity = 1.0
+shadow = true
+shadow_range = 4
+shadow_power = 3
+shadow_color = "0x990d0d0d"
+
+# Quickshell shell sizes (square corners everywhere)
+bar_height = 30
+popup_gap = 14
+radius = 0
+radius_small = 0
+padding = 16
+gap = 10
+
+[fonts]
+ui_family = "JetBrainsMono Nerd Font"
+ui_size = 16
+icon_size = 20
+terminal_family = "JetBrainsMono Nerd Font"
+terminal_size = 11.5
+
+[terminal]
+opacity = 1.0
+padding = 10
+cursor_shape = "block"
+scrollback = 10000
+
+[apps]
+terminal = "kitty"
+# Flea is not packaged in this flake; keep the old value for reference.
+# file_manager = "flea"
+file_manager = "nautilus"
+menu = "qs -c shell ipc call launcher toggle"
+wallpaper_dir = "~/Pictures/Wallpaper"
+wallpaper_picker = "qs -c shell ipc call stylepicker wallpaper"
+
+[hypr]
+kb_layout = "us"
+kb_options = "altwin:swap_alt_win"   # swap Alt <-> Super
+follow_mouse = 1                      # focus follows cursor movement
+mouse_refocus = false                 # do not refocus the hovered window on pointer motion
+natural_scroll = true                 # trackpad scroll follows finger direction
+blur_size = 3
+blur_passes = 1
+blur_vibrancy = 0.1696
+rounding_power = 2
+
+# ─────────────────────────────────────────────────────────────────────
+# Themes
+#
+# Each colorscheme is a Nix-managed file in ~/.config/kuro/themes/<name>.toml
+# (Omarchy colors.toml format). Pick one with [theme].scheme above.
+#
+#   kurogen themes                    list available themes
+#   kurogen scheme tokyo-night        switch theme
+# ─────────────────────────────────────────────────────────────────────

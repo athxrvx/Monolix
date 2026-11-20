@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $# == 1 ]] || { echo 'Usage: ai-font <font-family>' >&2; exit 2; }
+case "$1" in
+  'JetBrainsMono Nerd Font'|'CaskaydiaCove Nerd Font'|'FiraCode Nerd Font'|'Iosevka Nerd Font') family=$1 ;;
+  *) echo 'Font is not on the approved list' >&2; exit 2 ;;
+esac
+exec "$HOME/.config/quickshell/shell/bin/kurogen" set fonts.ui_family "$family" fonts.terminal_family "$family"

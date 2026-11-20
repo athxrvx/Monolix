@@ -1,12 +1,6 @@
 { pkgs, ... }:
 
 {
-  stylix.targets.zed = {
-    enable = true;
-    colors.enable = true;
-    fonts.enable = true;
-  };
-
   programs.zed-editor = {
     enable = true;
     defaultEditor = false;

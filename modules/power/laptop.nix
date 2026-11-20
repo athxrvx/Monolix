@@ -1,40 +1,30 @@
 { ... }:
 {
-  # Ryzen 7 8845HS supports AMD P-State EPP. The active driver lets firmware
-  # balance boost clocks against temperature and power limits.
+  # Ryzen 7 8845HS supports AMD P-State EPP. Let the active driver balance
+  # boost clocks against temperature and power limits; TuneD owns the policy.
   boot.kernelParams = [ "amd_pstate=active" ];
 
-  powerManagement = {
-    enable = true;
-    # amd-pstate-epp uses the powersave governor with EPP policy hints.
-    cpuFreqGovernor = "powersave";
-  };
-
-  # Let the Victus embedded controller manage the fans; use its platform
-  # profile interface for the vendor's performance/thermal modes when exposed.
+  # Kernel sleep/hibernate and UPower are infrastructure, not competing
+  # governors. UPower is also required by tuned-ppd for battery detection.
+  powerManagement.enable = true;
   services.upower.enable = true;
-  services.tlp = {
+
+  # Single power authority: TuneD plus its power-profiles-daemon compatibility
+  # service (tuned-ppd). The Kuro shell's power page keeps calling
+  # powerprofilesctl, which now talks to tuned-ppd over the PPD D-Bus API.
+  # ppdSettings is the only place that selects a profile; `recommend` is
+  # intentionally left unset so it cannot become a second authority.
+  services.tuned = {
     enable = true;
-    # Expose the standard power-profiles D-Bus API for the Quickshell menu.
-    pd.enable = true;
-    settings = {
-      CPU_DRIVER_OPMODE_ON_AC = "active";
-      CPU_DRIVER_OPMODE_ON_BAT = "active";
-
-      CPU_ENERGY_PERF_POLICY_ON_AC = "balance_performance";
-      # Favor efficiency for light work and keep firmware boost disabled on battery.
-      CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
-      CPU_ENERGY_PERF_POLICY_ON_SAV = "power";
-      CPU_BOOST_ON_BAT = "0";
-
-      PLATFORM_PROFILE_ON_AC = "performance";
-      PLATFORM_PROFILE_ON_BAT = "low-power";
-      PLATFORM_PROFILE_ON_SAV = "low-power";
-
-      # Save power on idle PCIe, wireless, and audio devices while unplugged.
-      RUNTIME_PM_ON_BAT = "auto";
-      WIFI_PWR_ON_BAT = "on";
-      SOUND_POWER_SAVE_ON_BAT = "1";
-    };
+    ppdSupport = true;
+    ppdSettings.main.default = "balanced";
   };
+
+  # Explicitly keep out every other CPU/power-policy daemon. NixOS's tuned
+  # module asserts against these anyway; stating it here makes the intent
+  # obvious and guards against a desktop module enabling one by default.
+  services.power-profiles-daemon.enable = false;
+  services.auto-cpufreq.enable = false;
+  services.tlp.enable = false;
+  hardware.system76.power-daemon.enable = false;
 }

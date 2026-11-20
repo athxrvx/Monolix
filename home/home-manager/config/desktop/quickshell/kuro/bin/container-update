@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+set -u
+
+if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+fi
+
+run_as_root() {
+    if (( EUID == 0 )); then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo -E -- "$@"
+    elif command -v doas >/dev/null 2>&1; then
+        doas "$@"
+    else
+        echo "Updating requires root, but neither sudo nor doas is available." >&2
+        return 127
+    fi
+}
+
+update_container() {
+    local distro="${ID:-} ${ID_LIKE:-}"
+
+    case "$distro" in
+        *debian*|*ubuntu*)
+            command -v apt-get >/dev/null 2>&1 || return 127
+            run_as_root apt-get update && run_as_root apt-get full-upgrade -y
+            ;;
+        *fedora*|*rhel*|*centos*)
+            if command -v dnf >/dev/null 2>&1; then
+                run_as_root dnf upgrade --refresh -y
+            elif command -v microdnf >/dev/null 2>&1; then
+                run_as_root microdnf upgrade -y
+            elif command -v tdnf >/dev/null 2>&1; then
+                run_as_root tdnf upgrade -y
+            else
+                return 127
+            fi
+            ;;
+        *arch*)
+            command -v pacman >/dev/null 2>&1 || return 127
+            run_as_root pacman -Syu --noconfirm
+            ;;
+        *suse*)
+            command -v zypper >/dev/null 2>&1 || return 127
+            run_as_root zypper refresh && run_as_root zypper update -y
+            ;;
+        *alpine*)
+            command -v apk >/dev/null 2>&1 || return 127
+            run_as_root apk update && run_as_root apk upgrade
+            ;;
+        *void*)
+            command -v xbps-install >/dev/null 2>&1 || return 127
+            run_as_root xbps-install -Syu
+            ;;
+        *gentoo*)
+            command -v emerge >/dev/null 2>&1 || return 127
+            run_as_root emerge --sync && run_as_root emerge --ask=n --verbose --update --deep --newuse @world
+            ;;
+        *)
+            if command -v apt-get >/dev/null 2>&1; then
+                run_as_root apt-get update && run_as_root apt-get full-upgrade -y
+            elif command -v dnf >/dev/null 2>&1; then
+                run_as_root dnf upgrade --refresh -y
+            elif command -v pacman >/dev/null 2>&1; then
+                run_as_root pacman -Syu --noconfirm
+            elif command -v zypper >/dev/null 2>&1; then
+                run_as_root zypper refresh && run_as_root zypper update -y
+            elif command -v apk >/dev/null 2>&1; then
+                run_as_root apk update && run_as_root apk upgrade
+            elif command -v xbps-install >/dev/null 2>&1; then
+                run_as_root xbps-install -Syu
+            else
+                echo "Unsupported container distro: ${ID:-unknown}" >&2
+                return 127
+            fi
+            ;;
+    esac
+}
+
+echo "Container: ${PRETTY_NAME:-${ID:-unknown}}"
+echo
+update_container
+status=$?
+
+if (( status == 0 )); then
+    echo
+    echo "Container update completed."
+else
+    echo
+    echo "Container update failed (exit status $status)."
+fi
+
+echo
+read -r -p "Press Enter to close this terminal... " _
+exit "$status"

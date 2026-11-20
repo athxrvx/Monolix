@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+set -u
+
+name="${1:-}"
+log="${2:-}"
+if [[ -z "$name" || -z "$log" ]]; then
+    echo "Usage: container-stop NAME LOG_FILE" >&2
+    exit 2
+fi
+
+mkdir -p "$(dirname "$log")" || exit 2
+: >"$log" || exit 2
+exec >>"$log" 2>&1
+
+notify_failure() {
+    if command -v notify-send >/dev/null 2>&1; then
+        action=$(notify-send --app-name=Quickshell --urgency=critical \
+            --action=view-log="View log" \
+            "Container was not stopped" "$name did not stop. Select View log to inspect the stop log." 2>>"$log" || true)
+        if [[ "$action" == "view-log" ]]; then
+            kitty --class omarchy-launcher-tui -e less +G -- "$log" >/dev/null 2>&1 &
+        fi
+    else
+        echo "NOTICE: notify-send is unavailable; no desktop notification or View log action was sent."
+    fi
+}
+
+echo "[$(date '+%F %T')] Stopping Podman container '$name'"
+if ! command -v podman >/dev/null 2>&1; then
+    echo "ERROR: podman command is unavailable."
+    notify_failure
+    exit 127
+fi
+
+podman stop "$name"
+stop_status=$?
+if (( stop_status != 0 )); then
+    echo "podman stop exited with status $stop_status; checking the actual container state."
+fi
+
+running=$(podman inspect --format '{{.State.Running}}' "$name" 2>/dev/null) || running=""
+
+if [[ "$running" == "false" ]]; then
+    echo "Container '$name' is stopped."
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send --app-name=Quickshell --urgency=normal \
+            "Container stopped" "$name has stopped." || true
+    else
+        echo "NOTICE: notify-send is unavailable; no desktop notification was sent."
+    fi
+    exit 0
+fi
+
+if [[ "$running" == "true" ]]; then
+    echo "ERROR: '$name' is still running after podman stop (exit status $stop_status)."
+else
+    echo "ERROR: could not verify whether '$name' stopped (podman stop exit status $stop_status)."
+fi
+
+notify_failure
+exit 1

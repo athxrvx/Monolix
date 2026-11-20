@@ -1,8 +1,9 @@
 { ... }:
 let
-  theme = import ../../../theme/theme.nix { };
-  colors = theme.colors;
-  hex = color: "#${color}";
+  # Static fallback palette mirroring Kuro's bundled jellybeans theme. The
+  # active palette still comes from ~/.config/kuro/kuro.toml for apps that can
+  # read ~/.cache/kuro/theme.json; Nix only needs values at eval time.
+  colors = import ../kuro/kuro-colors.nix;
 in
 {
   programs.foot = {
@@ -26,24 +27,24 @@ in
       mouse.hide-when-typing = "yes";
       colors = {
         alpha = "1.0";
-        background = hex colors.bg;
-        foreground = hex colors.fg;
-        regular0 = hex colors.c0;
-        regular1 = hex colors.c1;
-        regular2 = hex colors.c2;
-        regular3 = hex colors.c3;
-        regular4 = hex colors.c4;
-        regular5 = hex colors.c5;
-        regular6 = hex colors.c6;
-        regular7 = hex colors.c7;
-        bright0 = hex colors.c8;
-        bright1 = hex colors.c9;
-        bright2 = hex colors.c10;
-        bright3 = hex colors.c11;
-        bright4 = hex colors.c12;
-        bright5 = hex colors.c13;
-        bright6 = hex colors.c14;
-        bright7 = hex colors.c15;
+        background = colors.base00;
+        foreground = colors.base05;
+        regular0 = colors.base00;
+        regular1 = colors.base08;
+        regular2 = colors.base09;
+        regular3 = colors.base0A;
+        regular4 = colors.base0B;
+        regular5 = colors.base0C;
+        regular6 = colors.base0D;
+        regular7 = colors.base0E;
+        bright0 = colors.base03;
+        bright1 = colors.base08;
+        bright2 = colors.base09;
+        bright3 = colors.base0A;
+        bright4 = colors.base0B;
+        bright5 = colors.base0C;
+        bright6 = colors.base0D;
+        bright7 = colors.base0E;
       };
     };
   };

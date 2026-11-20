@@ -12,7 +12,7 @@ let
   '';
 in
 {
-  # ACPI handles lid close so Monolix is locked before the machine suspends.
+  # ACPI handles lid close so Kuro is locked before the machine suspends.
   # Keep the ACPI lid device armed so opening the lid can wake the machine.
   services.udev.extraRules = ''
     SUBSYSTEM=="platform", KERNEL=="PNP0C0D:00", ATTR{power/wakeup}="enabled"
@@ -40,16 +40,16 @@ in
   };
 
   systemd.services.lid-close-suspend = {
-    description = "Lock Monolix and suspend when the laptop lid closes";
+    description = "Lock Kuro and suspend when the laptop lid closes";
     serviceConfig.Type = "oneshot";
     script = ''
       ${lidIsClosed}
       lid_is_closed || exit 0
 
-      ${pkgs.systemd}/bin/systemctl --user --machine=atharva@.host start monolix-lid-lock.service
+      ${pkgs.systemd}/bin/systemctl --user --machine=atharva@.host start kuro-lid-lock.service
       ${pkgs.coreutils}/bin/sleep 1
 
-      # The lid may have been reopened while Monolix was locking.
+      # The lid may have been reopened while Kuro was locking.
       lid_is_closed && ${pkgs.systemd}/bin/systemctl suspend
     '';
   };

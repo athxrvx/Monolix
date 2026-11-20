@@ -1,12 +1,12 @@
 { ... }:
 {
-  # Run only the background daemon; Monolix provides the device controls.
+  # Run only the background daemon; Kuro provides the device controls.
   services.kdeconnect = {
     enable = true;
     indicator = false;
   };
 
-  # Keep KDE Connect's separate desktop window out of the Monolix launcher.
+  # Keep KDE Connect's separate desktop window out of the Kuro launcher.
   xdg.desktopEntries."org.kde.kdeconnect.app" = {
     name = "KDE Connect";
     exec = "kdeconnect-app";
@@ -16,7 +16,7 @@
   };
 
   # KDE Connect ships standalone helper windows which are not used by this
-  # setup; device management lives in the Monolix Cross Device page.
+  # setup; device management lives in the Kuro Bluetooth page.
   xdg.desktopEntries."org.kde.kdeconnect.sms" = {
     name = "KDE Connect SMS";
     exec = "kdeconnect-sms";

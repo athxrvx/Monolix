@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Add a package to the persistent dynashell environment.
+# Usage: dynashell-add [PACKAGE...]  (otherwise pick one with fzf)
+set -uo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dynashell"
+PACKAGES="$STATE_DIR/packages"
+mkdir -p "$STATE_DIR"
+touch "$PACKAGES"
+
+add_package() {
+    local pkg="$1"
+    [[ -n "$pkg" ]] || return 0
+    if grep -qxF "$pkg" "$PACKAGES"; then
+        echo "already in dynashell: $pkg"
+        return 0
+    fi
+    printf '%s\n' "$pkg" >> "$PACKAGES"
+    echo "added to dynashell: $pkg"
+}
+
+if (($# > 0)); then
+    for pkg in "$@"; do add_package "$pkg"; done
+    exit 0
+fi
+
+finder="${FZPAC_FINDER:-}"
+if [[ -z "$finder" ]] || ! command -v "$finder" >/dev/null 2>&1; then
+    if command -v fzf >/dev/null 2>&1; then finder="fzf"; else finder=""; fi
+fi
+
+list=""
+if [[ -n "$finder" ]]; then
+    echo "Building package list with 'nix search nixpkgs' (first run may take a while)..." >&2
+    list=$(nix search nixpkgs --json 2>/dev/null \
+        | jq -r 'keys[] | sub("^legacyPackages\\.[^.]+\\."; "")' \
+        | sort -u) || list=""
+fi
+
+if [[ -n "$list" ]]; then
+    choice=$(printf '%s\n' "$list" | "$finder" --prompt 'Add to dynashell> ') || exit 0
+    add_package "$choice"
+else
+    read -rp 'Package to add to dynashell: ' pkg
+    add_package "$pkg"
+fi

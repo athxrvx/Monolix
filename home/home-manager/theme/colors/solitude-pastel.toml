@@ -1,0 +1,35 @@
+name = "Solitude Pastel"
+mode = "dark"
+
+accent = "#aab8bd"
+selection = "#343d42"
+muted = "#737b80"
+
+background = "#121517"
+dark_background = "#0d1012"
+darker_background = "#090b0d"
+lighter_background = "#1b2023"
+
+foreground = "#d2d5d4"
+dark_foreground = "#737b80"
+light_foreground = "#c2c8c8"
+bright_foreground = "#e1e4e2"
+
+hyprland_active_border = "rgba(aab8bdee) rgba(c2c8c8ee)"
+hyprland_inactive_border = "rgb(292e31)"
+active_border_color = "#aab8bd"
+active_tab_background = "#343d42"
+
+red = "#c8919a"
+yellow = "#cbbd96"
+green = "#a5b8a2"
+cyan = "#96b6b3"
+blue = "#98adc8"
+magenta = "#b59fb8"
+
+bright_red = "#d3a0a8"
+bright_yellow = "#d9cba5"
+bright_green = "#b5c6b0"
+bright_cyan = "#a8c5c1"
+bright_blue = "#a8bad3"
+bright_magenta = "#c4aec7"

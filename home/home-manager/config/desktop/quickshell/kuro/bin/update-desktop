@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Rebuild and activate Home Manager only (the desktop/user configuration).
+set -uo pipefail
+
+export KURO_FLAKE="${KURO_FLAKE:-$HOME/.config/nixconfig}"
+kuro home
+status=$?
+printf '\nUpdate desktop exited with status %s. Press Enter to close.' "$status"
+read -r _
+exit "$status"

@@ -1,0 +1,21 @@
+# Kuro Zsh startup. Install/use by sourcing this from ~/.zshrc.
+for _kuro_plugin in \
+  "$ZSH_CONFIG_HOME/plugins/00-completion.zsh" \
+  "$ZSH_CONFIG_HOME/plugins/10-fzf.zsh" \
+  "$ZSH_CONFIG_HOME/plugins/20-autosuggestions.zsh" \
+  "$ZSH_CONFIG_HOME/plugins/40-shell-tools.zsh"; do
+  [[ -r "$_kuro_plugin" ]] && source "$_kuro_plugin"
+done
+unset _kuro_plugin
+
+# Kuro Af-Magic prompt. Loaded here so PROMPT is the last writer before
+# syntax-highlighting wraps the ZLE widgets.
+[[ -r "$ZSH_CONFIG_HOME/themes/kuro-af.zsh-theme" ]] && source "$ZSH_CONFIG_HOME/themes/kuro-af.zsh-theme"
+
+# Home Manager loads the packaged zsh-syntax-highlighting after this file.
+# This plugin only sets Kuro's colors; it no longer provides a native fallback.
+[[ -r "$ZSH_CONFIG_HOME/plugins/90-syntax-highlighting.zsh" ]] && source "$ZSH_CONFIG_HOME/plugins/90-syntax-highlighting.zsh"
+
+# Imperative escape hatch. Home Manager never owns this file: add your own
+# env vars, PATH entries, aliases and functions here.
+[[ -r "$ZSH_CONFIG_HOME/custom.zsh" ]] && source "$ZSH_CONFIG_HOME/custom.zsh"
