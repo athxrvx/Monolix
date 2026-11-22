@@ -58,7 +58,7 @@ scrollback = 10000
 terminal = "kitty"
 # Flea is not packaged in this flake; keep the old value for reference.
 # file_manager = "flea"
-file_manager = "nautilus"
+file_manager = "thunar"
 menu = "qs -c shell ipc call launcher toggle"
 wallpaper_dir = "~/Pictures/Wallpaper"
 wallpaper_picker = "qs -c shell ipc call stylepicker wallpaper"
@@ -69,8 +69,8 @@ kb_options = "altwin:swap_alt_win"   # swap Alt <-> Super
 follow_mouse = 1                      # focus follows cursor movement
 mouse_refocus = false                 # do not refocus the hovered window on pointer motion
 natural_scroll = true                 # trackpad scroll follows finger direction
-blur_size = 3
-blur_passes = 1
+blur_size = 8
+blur_passes = 2
 blur_vibrancy = 0.1696
 rounding_power = 2
 

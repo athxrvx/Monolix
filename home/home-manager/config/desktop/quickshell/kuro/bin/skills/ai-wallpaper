@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Pick a random image from the configured wallpaper folder and apply it with awww.
+# Only the wallpaper directory is accepted; no assistant-supplied shell text runs.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Wallpaper change failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-wallpaper <wallpaper-directory>' 2
+dir=$1
+[[ $dir == /* && $dir != *$'\n'* ]] || die 'Wallpaper folder must be an absolute path' 2
+[[ -d $dir ]] || die "Wallpaper folder does not exist: $dir"
+command -v awww >/dev/null 2>&1 || die 'awww is not installed' 127
+
+mapfile -t images < <(
+    find -L "$dir" -maxdepth 2 -type f \
+        \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \) \
+        -print 2>/dev/null | sort
+)
+(( ${#images[@]} > 0 )) || die "No images found in $dir"
+
+current=$(awww query 2>/dev/null | grep -m1 -oE 'image: .*' | sed 's/^image: //' || true)
+file=${images[RANDOM % ${#images[@]}]}
+if (( ${#images[@]} > 1 )); then
+    for _ in 1 2 3 4 5; do
+        [[ $file != "$current" ]] && break
+        file=${images[RANDOM % ${#images[@]}]}
+    done
+fi
+
+if awww img --transition-type grow --transition-pos center \
+    --transition-duration 1.1 --transition-fps 60 "$file"; then
+    notify_ok "Wallpaper changed" "${file##*/}"
+    printf 'Applied wallpaper: %s\n' "$file"
+else
+    status=$?
+    notify_error "Wallpaper change failed" "awww exited with status $status."
+    exit "$status"
+fi

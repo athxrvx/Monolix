@@ -3,8 +3,10 @@
 #   weather [lat] [lon] [city] [cache-file]
 # empty lat/lon = auto location from IP (ipinfo.io). Needs curl + jq.
 
-LAT="$1"
-LON="$2"
+#LAT="$1"
+#LON="$2"
+LAT="12.9452"
+LON="80.1296"
 CITY="$3"
 CACHE="${4:-$HOME/.cache/quickshell/weather.json}"
 TMP="$CACHE.tmp"

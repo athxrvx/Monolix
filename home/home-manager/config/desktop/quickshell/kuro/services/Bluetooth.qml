@@ -2,170 +2,149 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
+import Quickshell.Bluetooth
 
-// Bluetooth via bluetoothctl: power, paired devices, connect/disconnect.
-// `timeout` prevents bluetoothctl from hanging if bluetoothd isn't running.
+// Bluetooth via Quickshell's native BlueZ API (DBus).
+//
+// State is pushed by BlueZ, so there is no polling and no bluetoothctl output
+// parsing. The public shape matches what the bar, popup, control center and
+// launcher already expect.
 Singleton {
     id: root
 
-    property bool available: false
-    property bool powered: false
-    property string device: ""        // name of the first connected device
-    property var devices: []          // [{ mac, name, connected, paired }]
-    property string pending: ""       // MAC currently being connected/disconnected
-    property bool busy: false
-    property bool scanning: false
-    property string error: ""
+    readonly property var adapter: Bluetooth.defaultAdapter
+    readonly property bool available: adapter !== null
+    readonly property bool powered: adapter?.enabled ?? false
+    readonly property bool scanning: adapter?.discovering ?? false
+    readonly property bool busy: adapter !== null
+        && (adapter.state === BluetoothAdapterState.Enabling
+            || adapter.state === BluetoothAdapterState.Disabling)
 
-    function refresh() {
-        if (!statusProc.running && !busy) statusProc.running = true;
+    // Plain objects keep the { mac, name, connected, paired } shape used by
+    // existing delegates. Reading device properties in the binding makes it
+    // re-evaluate when a device connects, pairs or changes name.
+    readonly property var devices: {
+        const list = [...Bluetooth.devices.values].map(d => ({
+            mac: d.address,
+            name: d.name || d.deviceName || d.address,
+            connected: d.connected,
+            paired: d.paired
+        }));
+        list.sort((a, b) => (b.connected - a.connected)
+            || (b.paired - a.paired)
+            || a.name.localeCompare(b.name));
+        return list;
     }
+
+    readonly property string device: {
+        const d = devices.find(d => d.connected);
+        return powered && d ? d.name : "";
+    }
+
+    // Address of the device currently connecting, disconnecting or pairing.
+    readonly property string pending: {
+        for (const d of Bluetooth.devices.values) {
+            if (d.state === BluetoothDeviceState.Connecting
+                || d.state === BluetoothDeviceState.Disconnecting
+                || d.pairing)
+                return d.address;
+        }
+        return "";
+    }
+
+    property string error: ""
+    property var pairingDevice: null
+
+    // Kept for existing call sites; BlueZ updates are reactive.
+    function refresh() {}
 
     function toggle() {
-        if (busy || !available) return;
+        if (!adapter) return;
+        if (adapter.state === BluetoothAdapterState.Blocked) {
+            error = "Bluetooth is blocked by rfkill. Run: rfkill unblock bluetooth";
+            return;
+        }
         error = "";
-        busy = true;
-        const target = !powered;
-        powered = target;
-        if (!target) device = "";
-        toggleProc.command = target
-            ? ["sh", "-c", "rfkill unblock bluetooth; sleep 0.3; timeout 5 bluetoothctl power on"]
-            : ["timeout", "5", "bluetoothctl", "power", "off"];
-        toggleProc.outputText = "";
-        toggleProc.errorText = "";
-        toggleProc.running = true;
-    }
-
-    function toggleDevice(d) {
-        if (devProc.running || !powered || !d || !/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(d.mac)) return;
-        error = "";
-        pending = d.mac;
-        devProc.outputText = "";
-        devProc.errorText = "";
-        devProc.command = d.connected
-            ? ["timeout", "10", "bluetoothctl", "disconnect", d.mac]
-            : d.paired
-                ? ["timeout", "15", "bluetoothctl", "connect", d.mac]
-                : ["sh", "-c", "timeout 15 bluetoothctl pair \"$1\" && timeout 5 bluetoothctl trust \"$1\" && timeout 15 bluetoothctl connect \"$1\"", "sh", d.mac];
-        devProc.running = true;
+        adapter.enabled = !adapter.enabled;
     }
 
     function scan() {
-        if (!powered || scanning) return;
+        if (!adapter || !adapter.enabled || adapter.discovering) return;
         error = "";
-        scanning = true;
-        scanProc.errorText = "";
-        // Keep one bluetoothctl session alive for the full discovery window.
-        // Starting `scan on` and immediately exiting can stop discovery before
-        // nearby devices have time to appear.
-        scanProc.command = ["sh", "-c",
-            "{ printf 'scan on\\n'; sleep 8; printf 'scan off\\ndevices\\n'; sleep 1; } | timeout 12 bluetoothctl"];
-        scanProc.running = true;
+        adapter.discovering = true;
+        scanTimer.restart();
     }
 
-    // Line 1: Powered yes/no (empty = no adapter), then C|MAC Name and P|MAC Name
-    readonly property string statusScript: [
-        'echo "$(timeout 3 bluetoothctl show 2>/dev/null | awk \'/Powered:/ {print $2; exit}\')"',
-        'timeout 3 bluetoothctl devices Connected 2>/dev/null | sed -n "s/^Device /C|/p"',
-        '{ timeout 3 bluetoothctl devices Paired 2>/dev/null || timeout 3 bluetoothctl paired-devices 2>/dev/null; } | sed -n "s/^Device /P|/p"'
-    ].join("\n")
+    function toggleDevice(d) {
+        if (!adapter || !adapter.enabled || !d) return;
+        const dev = deviceFor(d.mac);
+        if (!dev) {
+            error = "Device is no longer available.";
+            return;
+        }
+        error = "";
+        if (dev.connected) dev.disconnect();
+        else if (dev.paired) dev.connect();
+        else {
+            // BlueZ falls back to a NoInputNoOutput (Just Works) agent when no
+            // agent is registered, so pairing works without bluetoothctl.
+            pairingDevice = dev;
+            dev.trusted = true;
+            dev.pair();
+        }
+    }
 
-    Process {
-        id: statusProc
-        command: ["sh", "-c", root.statusScript]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = text.split("\n");
-                const state = (lines[0] ?? "").trim();
-                root.available = state === "yes" || state === "no";
-                root.powered = state === "yes";
+    function deviceFor(mac) {
+        for (const d of Bluetooth.devices.values)
+            if (d.address === mac) return d;
+        return null;
+    }
 
-                const map = {};
-                const connected = {};
-                for (const l of lines) {
-                    if (!l.startsWith("C|") && !l.startsWith("P|")) continue;
-                    const rest = l.slice(2);
-                    const mac = rest.split(" ")[0];
-                    const name = rest.slice(mac.length + 1) || mac;
-                    if (l.startsWith("C|")) connected[mac] = true;
-                    map[mac] = { mac: mac, name: name, connected: false, paired: l.startsWith("P|") };
-                }
-                // Keep discovered, unpaired devices between status polls.
-                for (const d of root.devices)
-                    if (!d.paired && !d.connected && !map[d.mac]) map[d.mac] = d;
-                for (const mac in connected) if (map[mac]) map[mac].connected = true;
+    // BlueZ keeps discovering until a client stops it; keep a ~10s scan window.
+    Timer {
+        id: scanTimer
+        interval: 10000
+        onTriggered: if (root.adapter) root.adapter.discovering = false
+    }
 
-                root.devices = Object.values(map).sort((a, b) =>
-                    (b.connected - a.connected) || a.name.localeCompare(b.name));
-                const first = root.devices.find(d => d.connected);
-                root.device = root.powered && first ? first.name : "";
+    // Pairing is asynchronous. Connect once it succeeds; only report failure
+    // after the state settles so a late Paired update is not misread.
+    Timer {
+        id: pairSettleTimer
+        interval: 400
+        onTriggered: {
+            const dev = root.pairingDevice;
+            if (!dev) return;
+            root.pairingDevice = null;
+            if (dev.paired) {
+                if (!dev.connected) dev.connect();
+            } else {
+                root.error = "Pairing failed. Put the device in pairing mode and try again.";
             }
         }
     }
 
-    Process {
-        id: toggleProc
-        property string outputText: ""
-        property string errorText: ""
-        stdout: StdioCollector { onStreamFinished: toggleProc.outputText = text.trim() }
-        stderr: StdioCollector { onStreamFinished: toggleProc.errorText = text.trim() }
-        onExited: (code, status) => {
-            root.busy = false;
-            const details = toggleProc.errorText || toggleProc.outputText;
-            if (code !== 0 || /failed|error|not available/i.test(details))
-                root.error = details.split("\n").filter(Boolean).pop()
-                    || "Could not change Bluetooth power state.";
-            root.refresh();
+    Connections {
+        target: root.pairingDevice
+        ignoreUnknownSignals: true
+        function onPairedChanged() {
+            const dev = root.pairingDevice;
+            if (!dev || !dev.paired) return;
+            root.pairingDevice = null;
+            if (!dev.connected) dev.connect();
+        }
+        function onPairingChanged() {
+            if (root.pairingDevice && !root.pairingDevice.pairing)
+                pairSettleTimer.restart();
         }
     }
 
-    Process {
-        id: devProc
-        property string outputText: ""
-        property string errorText: ""
-        stdout: StdioCollector { onStreamFinished: devProc.outputText = text.trim() }
-        stderr: StdioCollector { onStreamFinished: devProc.errorText = text.trim() }
-        onExited: (code, status) => {
-            root.pending = "";
-            const details = (devProc.errorText || devProc.outputText).split("\n").filter(Boolean).pop() ?? "";
-            if (code !== 0 || /failed|error|not available/i.test(details))
-                root.error = details || "Device action failed. Check that the device is in pairing mode and nearby.";
-            root.refresh();
+    Connections {
+        target: root.adapter
+        ignoreUnknownSignals: true
+        function onStateChanged() {
+            if (root.adapter?.state === BluetoothAdapterState.Blocked)
+                root.error = "Bluetooth is blocked by rfkill. Run: rfkill unblock bluetooth";
         }
     }
-
-    Process {
-        id: scanProc
-        property string errorText: ""
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const found = {};
-                for (const d of root.devices) found[d.mac] = d;
-                const lines = text.split("\n");
-                for (const line of lines) {
-                    const match = line.match(/^Device\s+(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+(.+)$/);
-                    if (!match) continue;
-                    const previous = found[match[1]];
-                    found[match[1]] = {
-                        mac: match[1], name: match[3],
-                        connected: previous?.connected ?? false,
-                        paired: previous?.paired ?? false
-                    };
-                }
-                root.devices = Object.values(found).sort((a, b) =>
-                    (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name));
-            }
-        }
-        stderr: StdioCollector { onStreamFinished: scanProc.errorText = text.trim() }
-        onExited: (code, status) => {
-            root.scanning = false;
-            if (root.devices.length === 0 && scanProc.errorText)
-                root.error = scanProc.errorText.split("\n").filter(Boolean).pop();
-            else if (code !== 0 && root.devices.length === 0)
-                root.error = scanProc.errorText || "Bluetooth scan failed. Check that the adapter is available.";
-        }
-    }
-
-    Component.onCompleted: refresh()
 }

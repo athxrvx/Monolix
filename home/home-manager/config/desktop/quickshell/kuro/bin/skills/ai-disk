@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Read-only: filesystem usage for real (non-temporary) mounts.
+set -euo pipefail
+
+command -v df >/dev/null 2>&1 || { echo "df is unavailable" >&2; exit 127; }
+
+df -h -x tmpfs -x devtmpfs -x efivarfs \
+    --output=source,size,used,avail,pcent,target 2>/dev/null \
+    | awk 'NR <= 12'

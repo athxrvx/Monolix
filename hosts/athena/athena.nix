@@ -54,8 +54,8 @@ in
   time.timeZone = "Asia/Kolkata";
 
   # Lanzaboote signs boot entries with keys managed by sbctl.
-  # athena.secureboot.enable = true;
-  boot.loader.systemd-boot.enable = true;
+  athena.secureboot.enable = true;
+  # boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.kernelPackages = pkgs.linuxPackages_latest;
   # Use the existing swap partition to resume hibernated sessions.
@@ -77,6 +77,7 @@ in
   # HP Victus 15-fb2117ax: Ryzen 7 8845HS, Radeon 780M and RTX 4050.
   # (CPU microcode comes from hardware-configuration.nix.)
   hardware.enableRedistributableFirmware = true;
+  hardware.amdgpu.initrd.enable = true;
   hardware.graphics = {
     enable = true;
     enable32Bit = true;

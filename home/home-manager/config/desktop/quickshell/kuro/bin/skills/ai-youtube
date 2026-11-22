@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Search YouTube (or accept a URL) and play the first result in mpv.
+# Context for the assistant: pass one search string or URL. yt-dlp resolves it
+# and mpv plays it; the query is never evaluated as shell code.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "YouTube failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-youtube <search terms or YouTube URL>' 2
+query=$1
+[[ -n $query && ${#query} -le 160 ]] || die 'Enter a search query or URL (max 160 characters)' 2
+[[ $query != *$'\n'* && $query != *$'\r'* ]] || die 'Query must be one line' 2
+
+for tool in yt-dlp mpv; do
+    command -v "$tool" >/dev/null 2>&1 || die "$tool is unavailable" 127
+done
+
+if [[ $query =~ ^https?:// ]]; then
+    target=$query
+else
+    target="ytsearch1:$query"
+fi
+
+id=$(yt-dlp --no-warnings --no-playlist --get-id "$target" 2>/dev/null | head -n1 || true)
+[[ $id =~ ^[A-Za-z0-9_-]{11}$ ]] || die 'No playable YouTube result found'
+
+nohup mpv --no-terminal --force-window=yes --ytdl-format='bv*+ba/b' \
+    "https://www.youtube.com/watch?v=$id" </dev/null >/dev/null 2>&1 &
+notify_ok "Playing on YouTube" "$query"
+echo "Playing YouTube video $id"

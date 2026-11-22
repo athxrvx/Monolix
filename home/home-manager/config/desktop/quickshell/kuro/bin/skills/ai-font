@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Change the UI, shell, bar, and terminal font to one approved Nerd Font.
+# The assistant may only choose from this fixed family list.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+if [[ $# != 1 ]]; then
+    notify_error "Font change failed" "Usage: ai-font <font-family>"
+    echo 'Usage: ai-font <font-family>' >&2
+    exit 2
+fi
+case "$1" in
+    'JetBrainsMono Nerd Font'|'CaskaydiaCove Nerd Font'|'FiraCode Nerd Font'|'Iosevka Nerd Font') family=$1 ;;
+    *)
+        notify_error "Font change failed" "Font is not on the approved list: $1"
+        echo 'Font is not on the approved list' >&2
+        exit 2
+        ;;
+esac
+
+kurogen="$HOME/.config/quickshell/shell/bin/kurogen"
+if "$kurogen" set fonts.ui_family "$family" fonts.terminal_family "$family"; then
+    notify_ok "Font changed" "Applied $family."
+else
+    status=$?
+    notify_error "Font change failed" "kurogen exited with status $status."
+    exit "$status"
+fi

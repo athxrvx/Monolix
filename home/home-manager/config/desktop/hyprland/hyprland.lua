@@ -23,6 +23,7 @@ end
 -- behavior, startup, rules, then interactive bindings.
 loadModule("monitor")
 loadModule("environment", apps.terminal)
+loadModule("layouts")
 loadModule("animations")
 loadModule("autostart", home)
 loadModule("rules")

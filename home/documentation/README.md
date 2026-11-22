@@ -21,7 +21,7 @@ theme outputs.
 - **Host** — `hosts/athena/athena.nix` plus a generated
   `hardware-configuration.nix`; locale `en_IN`, timezone `Asia/Kolkata`,
   systemd-boot or Lanzaboote, and a `lts` specialisation on the stable kernel.
-- **Desktop** — greetd/tuigreet starts Hyprland; the Kuro shell runs under
+- **Desktop** — SDDM starts Hyprland with autologin; the Kuro shell runs under
   Quickshell from Hyprland autostart.
 - **Hardware** — Ryzen 7 8845HS, Radeon 780M and RTX 4050. PRIME offload is
   configured; run a program on the NVIDIA GPU with `nvidia-offload <app>`.
@@ -72,7 +72,8 @@ friends, and prints the underlying commands with `--verbose` or `--dry-run`.
 
 ```sh
 kuro help                      # full command list
-kuro sync                      # rebuild system + activate Home Manager
+kuro sync                      # rebuild system + activate live
+kuro boot                      # rebuild system + stage for next boot
 kuro home                      # activate Home Manager only
 kuro build                     # build without activating
 kuro test                      # activate temporarily until reboot
@@ -140,7 +141,7 @@ source is in `home/home-manager/config/desktop/quickshell/kuro`.
 ## Hyprland session
 
 `modules/desktop/hyprland.nix` enables Hyprland with XWayland and configures
-greetd/tuigreet to launch `start-hyprland` as the `greeter` user. The compositor
+SDDM to automatically log into the `hyprland` session as `atharva`. The compositor
 config lives under `home/home-manager/config/desktop/hyprland`:
 
 - `hyprland.lua` sets the keyboard layout and input options; XKB swaps Alt and

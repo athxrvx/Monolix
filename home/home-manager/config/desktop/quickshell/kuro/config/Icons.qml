@@ -16,12 +16,21 @@ Singleton {
     readonly property string arch:          g(0xF08C7)
     readonly property string nixos:         g(0xF313)   // nf-linux-nixos
     readonly property string cpu:           g(0xF0EE0)
+    readonly property string bot:           g(0xF06A9)
+    readonly property string music:         g(0xF075A)
     readonly property string memory:        g(0xF035B)
     readonly property string clipboard:     g(0xF0147)
     readonly property string trash:         g(0xF01B4)
     readonly property string close:         g(0xF0156)
     readonly property string overview:      g(0xF0570)
     readonly property string tray:          g(0xF0140)
+    readonly property string whatsapp:      g(0xF05A3)
+    readonly property string youtube:       g(0xF05C3)
+    readonly property string discord:       g(0xF066F)
+    readonly property string instagram:     g(0xF02FE)
+    readonly property string spotify:       g(0xF04C7)
+    readonly property string telegram:      g(0xF0501)
+    readonly property string gmail:         g(0xF02AB)
 
     // Session
     readonly property string power:         g(0xF0425)

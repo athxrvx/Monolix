@@ -24,6 +24,7 @@ let
       wrapProgram $out/bin/kuro --prefix PATH : ${lib.makeBinPath [
         pkgs.nix
         pkgs.nixos-rebuild
+        pkgs.libnotify
         pkgs.coreutils
         pkgs.systemd
         pkgs.fzf
@@ -37,7 +38,7 @@ let
   };
 in
 {
-  home.packages = [ kuro pkgs.fzf ];
+  home.packages = [ kuro pkgs.fzf pkgs.libnotify ];
 
   programs.zsh.initContent = lib.mkAfter ''
     fpath=("${kuro}/share/kuro/completions" $fpath)

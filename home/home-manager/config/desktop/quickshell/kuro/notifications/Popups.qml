@@ -30,7 +30,7 @@ PanelWindow {
         right: Theme.popupGap
     }
 
-    implicitWidth: Config.notifWidth
+    implicitWidth: Math.min(Config.notifWidth, 390)
     implicitHeight: list.contentHeight + 8
     color: "transparent"
 
@@ -50,24 +50,31 @@ PanelWindow {
 
         delegate: NotifCard {
             required property int nid
+            required property int token
             width: list.width
-            notif: Notifications.find(nid)
+            notif: Notifications.findEntry(token)
             onExpired: {
                 if (notif && notif.transient) Notifications.dismiss(notif);
-                else Notifications.hidePopup(nid);
+                else Notifications.hidePopupToken(token);
             }
         }
 
         add: Transition {
-            NumberAnimation { property: "x"; from: Config.notifWidth; to: 0; duration: 220; easing.type: Easing.OutCubic }
-            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180 }
+            NumberAnimation {
+                property: "x"
+                from: root.width
+                to: 0
+                duration: 150
+                easing.type: Easing.OutCubic
+            }
         }
         remove: Transition {
-            NumberAnimation { property: "x"; to: Config.notifWidth; duration: 180; easing.type: Easing.InCubic }
-            NumberAnimation { property: "opacity"; to: 0; duration: 160 }
-        }
-        displaced: Transition {
-            NumberAnimation { property: "y"; duration: 200; easing.type: Easing.OutCubic }
+            NumberAnimation {
+                property: "x"
+                to: root.width
+                duration: 120
+                easing.type: Easing.InCubic
+            }
         }
     }
 }

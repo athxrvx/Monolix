@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   services.resolved = {
     enable = true;
@@ -9,6 +9,7 @@
   services.fwupd.enable = true;    # firmware/BIOS updates
   zramSwap.enable = true;
 
+  services.portmaster.enable = true;
   # Battery/power info for Kuro and apps (Quickshell.Services.UPower).
   services.upower.enable = true;
 
@@ -28,4 +29,21 @@
       CUDA_VISIBLE_DEVICES = "0";
     };
   };
+
+  # Keep the Ollama unit available for the shell's explicit Start/Stop switch,
+  # but leave it stopped at boot so CUDA does not wake the discrete GPU.
+  systemd.services.ollama.wantedBy = lib.mkForce [ ];
+
+  # Let the logged-in desktop user control only the Ollama unit through the
+  # sidebar. No other privileged systemd service actions are granted here.
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (subject.user === "atharva" &&
+          action.id === "org.freedesktop.systemd1.manage-units" &&
+          action.lookup("unit") === "ollama.service" &&
+          ["start", "stop"].indexOf(action.lookup("verb")) !== -1) {
+        return polkit.Result.YES;
+      }
+    });
+  '';
 }

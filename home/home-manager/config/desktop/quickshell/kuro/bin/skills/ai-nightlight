@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Control night light by managing hyprsunset with fixed, validated temperatures.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Night light failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-nightlight <on|off|warm|cool|toggle>' 2
+command -v hyprsunset >/dev/null 2>&1 || die 'hyprsunset is not installed' 127
+
+stop() { pkill -x hyprsunset 2>/dev/null || true; }
+start() {
+    local temp=$1
+    stop
+    sleep 0.2
+    nohup hyprsunset -t "$temp" </dev/null >/dev/null 2>&1 &
+    sleep 0.2
+    pidof hyprsunset >/dev/null 2>&1 || die "hyprsunset failed to start"
+}
+
+case "$1" in
+    on)
+        start 4500
+        notify_ok "Night light on" "Warmth set to 4500K."
+        printf 'Night light is on at 4500K.\n'
+        ;;
+    warm)
+        start 3500
+        notify_ok "Night light warm" "Warmth set to 3500K."
+        printf 'Night light is on at 3500K.\n'
+        ;;
+    cool)
+        start 5000
+        notify_ok "Night light cool" "Warmth set to 5000K."
+        printf 'Night light is on at 5000K.\n'
+        ;;
+    off)
+        stop
+        notify_ok "Night light off" "Warmth filter removed."
+        printf 'Night light is off.\n'
+        ;;
+    toggle)
+        if pidof hyprsunset >/dev/null 2>&1; then
+            stop
+            notify_ok "Night light off" "Warmth filter removed."
+        else
+            start 4500
+            notify_ok "Night light on" "Warmth set to 4500K."
+        fi
+        ;;
+    *) die 'Invalid night light mode' 2 ;;
+esac

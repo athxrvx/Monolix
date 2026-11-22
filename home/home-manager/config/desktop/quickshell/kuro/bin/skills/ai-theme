@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Apply a Kuro colorscheme by id. rose-pine is the only light theme; the
+# remaining themes are dark. The assistant may only pass an available id.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+if [[ $# != 1 ]]; then
+    notify_error "Theme change failed" "Usage: ai-theme <theme-id>"
+    echo 'Usage: ai-theme <theme-id>' >&2
+    exit 2
+fi
+name=$1
+if [[ ! $name =~ ^[A-Za-z0-9_-]+$ ]]; then
+    notify_error "Theme change failed" "Invalid theme id: $name"
+    echo 'Invalid theme id' >&2
+    exit 2
+fi
+file="$HOME/.config/kuro/themes/$name.toml"
+if [[ ! -f $file ]]; then
+    notify_error "Theme change failed" "Unknown theme: $name"
+    echo "Unknown theme: $name" >&2
+    exit 1
+fi
+
+kurogen="$HOME/.config/quickshell/shell/bin/kurogen"
+if "$kurogen" set theme.scheme "$name"; then
+    active=$("$kurogen" themes | awk '$1 == "*" { print $2; exit }')
+    display_active=$active
+    [[ -n $display_active ]] || display_active=unknown
+    if [[ $active != "$name" ]]; then
+        notify_error "Theme change failed" "Expected $name, but the active scheme is $display_active."
+        echo "Theme verification failed: expected $name, got $display_active." >&2
+        exit 1
+    fi
+    notify_ok "Theme changed" "Applied $active."
+    printf 'Active theme: %s\n' "$active"
+else
+    status=$?
+    notify_error "Theme change failed" "kurogen exited with status $status."
+    exit "$status"
+fi

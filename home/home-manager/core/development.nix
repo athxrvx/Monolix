@@ -5,6 +5,7 @@
     git
     wget
     unzip
+
     # CLI toolchains and editors used by this setup.
     gcc
     gnumake
@@ -36,6 +37,7 @@
 
   imports = [
     ../config/development/opencode.nix
-    ../config/development/emacs.nix
+    # ../config/development/emacs/emacs.nix
+    ../config/development/neovim/neovim.nix
   ];
 }

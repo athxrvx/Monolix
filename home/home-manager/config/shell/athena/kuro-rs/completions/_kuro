@@ -3,8 +3,8 @@
 _kuro() {
   local -a commands profiles
   commands=(
-    'sync:Build and activate system and Home Manager' 'switch:Build and activate system' 'home:Build and activate Home Manager'
-    'build:Build without activating' 'test:Temporarily activate' 'boot:Activate on next boot' 'check:Evaluate the flake'
+    'sync:Build and activate system and Home Manager' 'switch:Build and activate system' 's:Build and activate system' 'home:Build and activate Home Manager'
+    'build:Build without activating' 'b:Build without activating' 'test:Temporarily activate' 'boot:Activate on next boot' 'bt:Activate on next boot' 'check:Evaluate the flake'
     'status:Show current generations' 'generations:List generations' 'jump:Switch Home Manager generation'
     'profile:List profiles' 'info:Show setup info' 'doctor:Check setup' 'path:Print flake directory'
     'pull:Update flake inputs' 'update:Update flake inputs' 'clean:Clean Home Manager generations'
@@ -19,7 +19,7 @@ _kuro() {
     _describe -t commands 'kuro command' commands
   elif [[ ${words[2]} == --profile || ${words[2]} == -p ]]; then
     _describe -t profiles 'profile' profiles
-  elif [[ ${words[2]} == sync || ${words[2]} == switch || ${words[2]} == home || ${words[2]} == build || ${words[2]} == test || ${words[2]} == boot || ${words[2]} == check ]]; then
+  elif [[ ${words[2]} == sync || ${words[2]} == switch || ${words[2]} == s || ${words[2]} == home || ${words[2]} == build || ${words[2]} == b || ${words[2]} == test || ${words[2]} == boot || ${words[2]} == bt || ${words[2]} == check ]]; then
     _describe -t profiles 'profile' profiles
   elif [[ ${words[2]} == generations ]]; then
     _values 'generation type' system home all

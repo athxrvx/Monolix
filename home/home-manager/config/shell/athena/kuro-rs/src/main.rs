@@ -21,10 +21,10 @@ Global options:
 
 Build and activate:
   sync, switch, s [PROFILE]  Build and activate the system and Home Manager
+  boot, bt [PROFILE]         Build and set as default for next boot (no live switch)
   home [PROFILE]             Build and activate Home Manager only
   build, b [PROFILE]         Build without activating
   test [PROFILE]             Activate temporarily until reboot
-  boot [PROFILE]             Activate on next boot
   check [PROFILE]            Evaluate the flake without building
 
 Inspect and maintain:
@@ -105,43 +105,41 @@ impl App {
         if self.color { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_string() }
     }
     fn bold(&self, text: &str) -> String { self.styled("1", text) }
-    fn cyan(&self, text: &str) -> String { self.styled("36", text) }
-    fn bright_cyan(&self, text: &str) -> String { self.styled("1;36", text) }
-    fn magenta(&self, text: &str) -> String { self.styled("1;35", text) }
-    fn green(&self, text: &str) -> String { self.styled("32", text) }
-    fn red(&self, text: &str) -> String { self.styled("1;31", text) }
-    fn yellow(&self, text: &str) -> String { self.styled("1;33", text) }
-    fn dim(&self, text: &str) -> String { self.styled("90", text) }
+    fn cyan(&self, text: &str) -> String { self.styled("38;5;110", text) }
+    fn bright_cyan(&self, text: &str) -> String { self.styled("1;38;5;117", text) }
+    fn magenta(&self, text: &str) -> String { self.styled("38;5;176", text) }
+    fn green(&self, text: &str) -> String { self.styled("38;5;114", text) }
+    fn red(&self, text: &str) -> String { self.styled("1;38;5;167", text) }
+    fn yellow(&self, text: &str) -> String { self.styled("38;5;179", text) }
+    fn dim(&self, text: &str) -> String { self.styled("38;5;244", text) }
 
     fn fail(&self, message: impl AsRef<str>) -> ! {
         eprintln!("{}  {} {}", self.red("✗"), self.bold("kuro"), message.as_ref());
         process::exit(2)
     }
-    fn ok(&self, text: &str) { println!("  {}  {}  {}", self.magenta("│"), self.green("✓"), text); }
-    fn warn(&self, text: &str) { eprintln!("  {}  {}  {}", self.magenta("│"), self.yellow("!"), text); }
+    fn ok(&self, text: &str) { println!("  {}  {}", self.green("✓"), text); }
+    fn warn(&self, text: &str) { eprintln!("  {}  {}", self.yellow("!"), text); }
 
-    // A labelled section frame. Pair with section_end for a closed box.
+    // A labelled section with a short supporting footer.
     fn section(&self, title: &str) {
         println!();
-        println!("  {}  {}", self.magenta("┌─"), self.bold(title));
+        println!("  {}", self.bold(title));
     }
     fn section_end(&self, detail: &str) {
-        println!("  {}  {}", self.magenta("└─"), self.dim(detail));
-        println!();
+        println!("  {}\n", self.dim(detail));
     }
 
     // Announce an interactive handoff (fzf, nix shell, editor) without boxing
     // child output: those tools need inherited stdio to draw their own UI.
     fn handoff(&self, command: &str, detail: &str, args: &[OsString]) {
         println!();
-        println!("  {}  {}  {}", self.magenta("┌─"), self.bright_cyan(&format!("kuro {command}")), self.dim(detail));
-        println!("  {}  {}  {}", self.magenta("│"), self.bright_cyan("$"), command_string(args));
-        println!("  {}  {}", self.magenta("└─"), self.dim("interactive · handing off"));
+        println!("{}  {}", self.bright_cyan(&format!("kuro {command}")), self.dim(detail));
+        println!("  {} {}", self.dim("$"), command_string(args));
+        println!("  {}", self.dim("interactive · handing off"));
         println!();
     }
 
-    // Nala-style task banner: tinted frame, labelled fields, no noise when
-    // output is piped or color is disabled.
+    // Keep task context compact and readable in terminals and logs.
     fn header(&self, command: &str, subtitle: &str) {
         if !self.color {
             println!("kuro {command} — {subtitle}");
@@ -149,10 +147,10 @@ impl App {
         }
         let flake = self.flake.as_ref().map(|p| shorten_home(p)).unwrap_or_else(|| "...".into());
         println!();
-        println!("  {} {}", self.magenta("┌─"), self.bright_cyan(&format!("kuro {command}")));
-        println!("  {}  {}  {}", self.magenta("│"), self.dim("task   "), subtitle);
-        println!("  {}  {}  {}", self.magenta("│"), self.dim("flake  "), self.magenta(&flake));
-        println!("  {}  {}  {}", self.magenta("│"), self.dim("profile"), self.magenta(&self.options.profile));
+        println!("{}", self.bright_cyan(&format!("kuro {command}")));
+        println!("  {}  {}", self.dim("task   "), subtitle);
+        println!("  {}  {}", self.dim("flake  "), self.magenta(&flake));
+        println!("  {}  {}", self.dim("profile"), self.magenta(&self.options.profile));
         println!();
     }
 
@@ -256,7 +254,7 @@ impl App {
         }
         drop(tx);
 
-        let output = OutputBox::new(self.color, label);
+        let mut output = OutputBox::new(self.color, label);
         let mut stdout_text = String::new();
         let mut lines = 0usize;
         for item in rx {
@@ -275,8 +273,27 @@ impl App {
         } else {
             format!("{label} failed (exit {code}) after {lines} lines")
         };
+        let seconds = output.started.elapsed().as_secs();
         output.finish(success, &message);
+        self.notify_task(label, success, seconds);
         TaskResult { success, code, stdout: stdout_text }
+    }
+
+    fn notify_task(&self, label: &str, success: bool, seconds: u64) {
+        if seconds < 5 { return; }
+        let Some(notify_send) = find_executable("notify-send") else { return; };
+        let title = format!("Kuro · {label}");
+        let body = if success {
+            format!("Completed in {}.", format_duration(seconds))
+        } else {
+            format!("Failed after {}.", format_duration(seconds))
+        };
+        let urgency = if success { "normal" } else { "critical" };
+        let _ = Command::new(notify_send)
+            .args(["--app-name=Kuro", "--urgency", urgency, &title, &body])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
     }
 
     fn command_task(&self, args: &[OsString], label: &str) -> ! {
@@ -292,7 +309,9 @@ impl App {
             _ => self.fail(format!("unknown generation target '{target}' (choose system or home)")),
         };
         if target == "home" && profile_path.symlink_metadata().is_err() {
-            self.warn(&format!("no Home Manager generations found at {}", profile_path.display()));
+            println!("\n{}", self.bold("home generations"));
+            println!("  {} {}", self.green("●"), self.dim("integrated with system profile (useUserPackages = true)"));
+            println!("  {}\n", self.dim("managed via nixos-rebuild"));
             return;
         }
         // nix-env opens the profile lock even for read-only listing, so the
@@ -309,13 +328,13 @@ impl App {
         }
         let text = String::from_utf8_lossy(&output.stdout);
         let rows: Vec<&str> = text.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
-        println!("  {}  {}", self.magenta("┌─"), self.bold(&format!("{target} generations")));
+        println!("\n{}", self.bold(&format!("{target} generations")));
         for row in &rows {
             let marker = if row.contains("(current)") { self.green("●") } else { self.dim("○") };
-            println!("  {}  {}  {}", self.magenta("│"), marker, self.dim(row));
+            println!("  {}  {}", marker, self.dim(row));
         }
-        if rows.is_empty() { println!("  {}  {}", self.magenta("│"), self.dim("(none)")); }
-        println!("  {}  {}", self.magenta("└─"), self.dim(&format!("{} generation(s) · {}", rows.len(), profile_path.display())));
+        if rows.is_empty() { println!("  {}", self.dim("(none)")); }
+        println!("  {}\n", self.dim(&format!("{} generation(s) · {}", rows.len(), profile_path.display())));
     }
 
     fn delete_generations(&self, target: &str, keep: Option<&str>) {
@@ -364,43 +383,51 @@ impl App {
             "path" => {
                 let flake = self.require_flake();
                 self.section("flake");
-                println!("  {}  {}", self.magenta("│"), self.magenta(&flake.display().to_string()));
+                println!("  {}", self.magenta(&flake.display().to_string()));
                 self.section_end(&shorten_home(&flake));
             }
             "profile" | "pr" => {
                 self.section("profiles");
-                println!("  {}  {:<9}  {}", self.magenta("│"), self.bright_cyan("athena"), self.dim("Hyprland + Kuro · default"));
+                println!("  {:<9}  {}", self.bright_cyan("athena"), self.dim("Hyprland + Kuro · default"));
                 self.section_end("1 profile available");
             }
             "info" => {
                 let flake = self.require_flake();
                 self.section("kuro info");
-                println!("  {}  {:<9}  {}", self.magenta("│"), self.bright_cyan("flake"), self.magenta(&shorten_home(&flake)));
-                println!("  {}  {:<9}  {}", self.magenta("│"), self.bright_cyan("profile"), self.magenta(&self.options.profile));
-                println!("  {}  {:<9}  {}", self.magenta("│"), self.bright_cyan("user"), self.magenta(&self.options.user));
-                println!("  {}  {:<9}  {}", self.magenta("│"), self.bright_cyan("home state"), self.dim(&home_profile_path().display().to_string()));
+                println!("  {:<9}  {}", self.bright_cyan("flake"), self.magenta(&shorten_home(&flake)));
+                println!("  {:<9}  {}", self.bright_cyan("profile"), self.magenta(&self.options.profile));
+                println!("  {:<9}  {}", self.bright_cyan("user"), self.magenta(&self.options.user));
+                println!("  {:<9}  {}", self.bright_cyan("home state"), self.dim(&home_profile_path().display().to_string()));
                 let version = self.capture(&os_args(&["nix", "--version"]));
                 if version.status.success() {
-                    println!("  {}  {:<9}  {}", self.magenta("│"), self.bright_cyan("nix"), self.dim(String::from_utf8_lossy(&version.stdout).trim()));
+                    println!("  {:<9}  {}", self.bright_cyan("nix"), self.dim(String::from_utf8_lossy(&version.stdout).trim()));
                 }
                 self.section_end("info complete");
             }
             "doctor" => {
                 self.profile(&self.options.profile);
                 let flake = self.require_flake();
-                self.header("doctor", "check local setup");
+                self.header("doctor", "check local setup and dependencies");
                 let mut ok = 0;
                 let mut missing = 0;
+                self.section("Flake integrity");
                 if flake.join("flake.nix").is_file() { self.ok(&format!("flake.nix found in {}", shorten_home(&flake))); ok += 1; } else { self.fail("flake.nix is missing"); }
-                if flake.join("flake.lock").is_file() { self.ok("flake.lock found"); ok += 1; } else { self.warn("flake.lock is missing; Nix will create it when needed"); missing += 1; }
-                self.section("Required tools");
-                for tool in ["nix", "nixos-rebuild", "sudo"] {
+                if flake.join("flake.lock").is_file() { self.ok("flake.lock found"); ok += 1; } else { self.warn("flake.lock is missing; run 'kuro update'"); missing += 1; }
+                self.section("Core system tools");
+                for tool in ["nix", "nixos-rebuild", "sudo", "git"] {
                     match find_executable(tool) {
                         Some(path) => { self.ok(&format!("{tool}: {}", path.display())); ok += 1; }
                         None => { self.warn(&format!("{tool} is not in PATH")); missing += 1; }
                     }
                 }
-                self.section_end(&format!("{ok} ok · {missing} missing"));
+                self.section("Desktop tools");
+                for tool in ["hyprland", "fzf"] {
+                    match find_executable(tool) {
+                        Some(path) => { self.ok(&format!("{tool}: {}", path.display())); ok += 1; }
+                        None => { self.warn(&format!("{tool} is not in PATH")); missing += 1; }
+                    }
+                }
+                self.section_end(&format!("{ok} ok · {missing} missing/warning(s)"));
             }
             "status" => {
                 self.profile(&self.options.profile);
@@ -457,14 +484,37 @@ impl App {
                 let (_, keep) = parse_clean_args(self, &args[1..], "kuro system clean [--keep COUNT]");
                 self.delete_generations("system", keep);
             }
-            "sync" | "switch" | "s" | "build" | "b" | "test" | "boot" => {
+            "sync" | "switch" | "s" => {
                 if args.len() > 1 { self.fail(format!("usage: kuro {command} [PROFILE]")); }
                 let target = args.first().and_then(|s| s.to_str()).unwrap_or(&self.options.profile).to_string();
                 self.profile(&target);
-                let action = match command { "sync" | "switch" | "s" => "switch", "build" | "b" => "build", "test" => "test", _ => "boot" };
-                self.header(command, &format!("{action} profile {target}"));
+                self.header(command, &format!("switch profile {target} (rebuild and activate)"));
                 let flake_ref = self.flake_ref();
-                self.command_task(&["sudo".into(), "nixos-rebuild".into(), action.into(), "--flake".into(), format!("{flake_ref}#{target}").into()], "System rebuild");
+                self.command_task(&["sudo".into(), "nixos-rebuild".into(), "switch".into(), "--flake".into(), format!("{flake_ref}#{target}").into()], "System switch");
+            }
+            "boot" | "bt" => {
+                if args.len() > 1 { self.fail(format!("usage: kuro {command} [PROFILE]")); }
+                let target = args.first().and_then(|s| s.to_str()).unwrap_or(&self.options.profile).to_string();
+                self.profile(&target);
+                self.header(command, &format!("stage profile {target} for next boot (no live switch)"));
+                let flake_ref = self.flake_ref();
+                self.command_task(&["sudo".into(), "nixos-rebuild".into(), "boot".into(), "--flake".into(), format!("{flake_ref}#{target}").into()], "Bootloader update");
+            }
+            "build" | "b" => {
+                if args.len() > 1 { self.fail(format!("usage: kuro {command} [PROFILE]")); }
+                let target = args.first().and_then(|s| s.to_str()).unwrap_or(&self.options.profile).to_string();
+                self.profile(&target);
+                self.header(command, &format!("build profile {target} without activating"));
+                let flake_ref = self.flake_ref();
+                self.command_task(&["nix".into(), "build".into(), format!("{flake_ref}#nixosConfigurations.{target}.config.system.build.toplevel").into(), "--no-link".into(), "--print-out-paths".into()], "System build");
+            }
+            "test" => {
+                if args.len() > 1 { self.fail("usage: kuro test [PROFILE]"); }
+                let target = args.first().and_then(|s| s.to_str()).unwrap_or(&self.options.profile).to_string();
+                self.profile(&target);
+                self.header("test", &format!("test profile {target} temporarily (reverts on reboot)"));
+                let flake_ref = self.flake_ref();
+                self.command_task(&["sudo".into(), "nixos-rebuild".into(), "test".into(), "--flake".into(), format!("{flake_ref}#{target}").into()], "System test");
             }
             "home" => {
                 if args.len() > 1 { self.fail("usage: kuro home [PROFILE]"); }
@@ -481,7 +531,7 @@ impl App {
                 } else {
                     let build_result = self.run_task(&build, "Home Manager build");
                     if !build_result.success { process::exit(build_result.code); }
-                    let activation = build_result.stdout.trim().to_string();
+                    let activation = build_result.stdout.lines().rev().find(|l| l.starts_with("/nix/store/")).unwrap_or(build_result.stdout.trim()).trim().to_string();
                     let script = Path::new(&activation).join("activate");
                     if !script.is_file() { self.fail(format!("Home Manager activation script missing from {activation}")); }
                     let activate_result = self.run_task(&[script.into_os_string()], "Home activation");
@@ -558,11 +608,11 @@ impl App {
             if !output.status.success() { io::stderr().write_all(&output.stderr).ok(); process::exit(output.status.code().unwrap_or(1)); }
             let generations = String::from_utf8_lossy(&output.stdout);
             let fzf = find_executable("fzf").unwrap_or_else(|| self.fail("fzf is required for 'kuro jump --pick'"));
-            println!("  {}  {}", self.magenta("┌─"), self.bright_cyan("pick a Home Manager generation"));
-            let mut picker = Command::new(fzf).args(["--prompt=Home generation > ", "--height=40%", "--reverse", "--border", "--header=Choose a Home Manager generation"]).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap_or_else(|error| self.fail(format!("could not start fzf: {error}")));
+            println!("\n{}", self.bright_cyan("pick a Home Manager generation"));
+            let mut picker = Command::new(fzf).args(["--height=50%", "--layout=reverse", "--border", "--info=inline", "--pointer=▌", "--prompt=home › ", "--header=Choose a generation · Enter to switch · Esc to cancel"]).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap_or_else(|error| self.fail(format!("could not start fzf: {error}")));
             if let Some(mut input) = picker.stdin.take() { let _ = input.write_all(generations.as_bytes()); }
             let selected = picker.wait_with_output().unwrap_or_else(|error| self.fail(format!("fzf failed: {error}")));
-            println!("  {}  {}", self.magenta("└─"), self.dim("selection complete"));
+            println!("{}", self.dim("selection complete"));
             if !selected.status.success() { return; }
             let line = String::from_utf8_lossy(&selected.stdout).trim().to_string();
             let gen = line.split_whitespace().next().unwrap_or("").to_string();
@@ -595,10 +645,36 @@ impl App {
 
     fn menu(&mut self) {
         let fzf = find_executable("fzf").unwrap_or_else(|| self.fail("fzf is required for the interactive menu"));
-        let entries = ["sync\tBuild and activate system", "home\tBuild and activate Home Manager", "status\tShow system and home generations", "jump --pick\tChoose a Home Manager generation", "doctor\tCheck the local setup", "help\tShow all commands"];
-        println!("  {}  {}", self.magenta("┌─"), self.bright_cyan("kuro menu"));
-        println!("  {}  {}", self.magenta("└─"), self.dim("pick a command"));
-        let mut picker = Command::new(fzf).args(["--prompt=kuro > ", "--height=50%", "--reverse", "--border", "--with-nth=1,2", "--delimiter=\t"]).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap_or_else(|error| self.fail(format!("could not start fzf: {error}")));
+        let flake = self.options.flake_override.as_ref()
+            .map(|path| shorten_home(&absolute_path(path)))
+            .or_else(|| find_flake().map(|path| shorten_home(&path)))
+            .unwrap_or_else(|| "not found · use --flake PATH".into());
+        println!();
+        println!("  {}", self.bright_cyan("KURO  /  SYSTEM WORKSPACE"));
+        println!("  {}  {}", self.dim("profile  "), self.bright_cyan(&self.options.profile));
+        println!("  {}  {}", self.dim("flake    "), self.dim(&flake));
+                println!("  {}", self.dim("  ↑↓ navigate   type to filter   enter select   esc quit"));
+        println!();
+        let entries = [
+            "sync\tSYSTEM    ·  Rebuild and switch this session",
+            "boot\tSYSTEM    ·  Build and select for next boot",
+            "test\tSYSTEM    ·  Try the configuration until reboot",
+            "build\tSYSTEM    ·  Build without activating",
+            "home\tDESKTOP   ·  Apply shell and user configuration",
+            "status\tINSPECT   ·  View active system and generations",
+            "doctor\tINSPECT   ·  Check flake and required tools",
+            "jump --pick\tRECOVERY  ·  Choose a previous generation",
+            "update\tMAINTAIN  ·  Refresh flake inputs",
+            "clean\tMAINTAIN  ·  Remove old generations",
+            "help\tREFERENCE ·  Browse all commands and examples",
+        ];
+        let mut picker = Command::new(fzf).args([
+            "--height=65%", "--layout=reverse", "--border=rounded", "--info=inline",
+            "--pointer=▌", "--marker=●", "--prompt=kuro › ",
+            "--header=Choose an action", "--with-nth=1,2", "--delimiter=\t", "--no-sort",
+            "--color=fg:#cdd6f4,bg:-1,hl:#89b4fa,fg+:#f5e0dc,bg+:#313244,hl+:#89b4fa,prompt:#cba6f7,pointer:#89b4fa,marker:#a6e3a1,info:#a6adc8,header:#a6adc8,border:#45475a",
+        ]).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
+            .unwrap_or_else(|error| self.fail(format!("could not start fzf: {error}")));
         if let Some(mut input) = picker.stdin.take() { let _ = input.write_all(entries.join("\n").as_bytes()); }
         let output = picker.wait_with_output().unwrap_or_else(|error| self.fail(format!("fzf failed: {error}")));
         if !output.status.success() { return; }
@@ -649,39 +725,75 @@ struct OutputLine {
     text: String,
 }
 
-// A static frame with live child output flowing through it. One top border,
-// one line per child line, one footer — no redraws, no fake percentage.
+// Stream child output and show a bar only when Nix reports a work plan.
 struct OutputBox {
     color: bool,
+    interactive: bool,
     started: Instant,
+    total: usize,
+    completed: usize,
 }
 
 impl OutputBox {
     fn new(color: bool, label: &str) -> Self {
         println!();
-        if color {
-            println!("  \x1b[1;35m┌─\x1b[0m \x1b[1;36m{}\x1b[0m  \x1b[90m(live output)\x1b[0m", label);
-        } else {
-            println!("  ┌─ {label} (live output)");
-        }
-        Self { color, started: Instant::now() }
+        let title = if color { format!("\x1b[1;38;5;117mKuro\x1b[0m · {}", label) } else { format!("Kuro · {}", label) };
+        println!("  {title}");
+        Self { color, interactive: io::stdout().is_terminal(), started: Instant::now(), total: 0, completed: 0 }
     }
 
     fn paint(&self, code: &str, text: &str) -> String {
         if self.color { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_string() }
     }
 
-    fn line(&self, text: &str, is_stdout: bool) {
-        let rail = self.paint("90", "│");
-        let line = if is_stdout { text.to_string() } else { self.paint("37", text) };
-        println!("  {rail}  {line}");
+    fn update_plan(&mut self, text: &str) {
+        if !text.contains("will be built") && !text.contains("will be fetched") { return; }
+        if let Some(count) = text.split_whitespace().nth(1).and_then(|value| value.parse::<usize>().ok()) {
+            self.total = self.total.saturating_add(count);
+        }
     }
 
-    fn finish(self, success: bool, message: &str) {
+    fn is_work_event(text: &str) -> bool {
+        text.contains("building '/nix/store/") || text.contains("copying path '/nix/store/")
+    }
+
+    fn draw_progress(&self) {
+        if !self.interactive || self.total == 0 { return; }
+        let width = 24usize;
+        let filled = self.completed.saturating_mul(width) / self.total;
+        let bar = format!("{}{}", "█".repeat(filled), "░".repeat(width - filled));
+        let pct = self.completed.saturating_mul(100) / self.total;
+        print!("\r\x1b[2K  {}  {}  {}/{}  {}%",
+            self.paint("38;5;176", &bar), self.paint("38;5;244", "Nix actions"),
+            self.completed, self.total, pct);
+        let _ = io::stdout().flush();
+    }
+
+    fn clear_progress(&self) {
+        if self.interactive && self.total > 0 {
+            print!("\r\x1b[2K");
+            let _ = io::stdout().flush();
+        }
+    }
+
+    fn line(&mut self, text: &str, is_stdout: bool) {
+        self.update_plan(text);
+        let work_event = Self::is_work_event(text);
+        self.clear_progress();
+        let line = if is_stdout { text.to_string() } else { self.paint("38;5;179", text) };
+        println!("  · {line}");
+        if work_event && self.total > 0 { self.completed = (self.completed + 1).min(self.total); }
+        self.draw_progress();
+    }
+
+    fn finish(mut self, success: bool, message: &str) {
         let seconds = self.started.elapsed().as_secs();
-        let icon = if success { self.paint("1;32", "✓") } else { self.paint("1;31", "✗") };
-        let text = if success { self.paint("1;36", message) } else { self.paint("1;31", message) };
-        println!("  {}  {icon}  {text}  {}", self.paint("1;35", "└─"), self.paint("90", &format!("({}s)", seconds)));
+        if success && self.total > 0 { self.completed = self.total; }
+        self.clear_progress();
+        if self.total > 0 { self.draw_progress(); println!(); }
+        let icon = if success { self.paint("38;5;114", "✓") } else { self.paint("38;5;167", "✗") };
+        let text = if success { self.paint("1;38;5;117", message) } else { self.paint("1;38;5;167", message) };
+        println!("  {icon} {text}  {}", self.paint("38;5;244", &format!("({}s)", seconds)));
         println!();
     }
 }
@@ -693,6 +805,11 @@ fn shorten_home(path: &Path) -> String {
         }
     }
     path.display().to_string()
+}
+
+fn format_duration(seconds: u64) -> String {
+    if seconds < 60 { format!("{seconds}s") }
+    else { format!("{}m {:02}s", seconds / 60, seconds % 60) }
 }
 
 fn main() {

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Read-only: summarize the cached Open-Meteo response written by bin/weather.
+set -euo pipefail
+
+cache="${HOME:?}/.cache/quickshell/weather.json"
+if [[ ! -f $cache ]]; then
+    echo "No cached weather yet. Open the calendar popup once, or run bin/weather." >&2
+    exit 1
+fi
+
+command -v jq >/dev/null 2>&1 || { echo "jq is unavailable" >&2; exit 127; }
+
+jq -r '
+    def condition:
+        if . == 0 then "clear"
+        elif . <= 2 then "mostly clear"
+        elif . == 3 then "overcast"
+        elif . == 45 or . == 48 then "fog"
+        elif . >= 51 and . <= 57 then "drizzle"
+        elif . >= 61 and . <= 67 then "rain"
+        elif . >= 71 and . <= 77 then "snow"
+        elif . >= 80 and . <= 82 then "showers"
+        elif . >= 85 and . <= 86 then "snow showers"
+        elif . >= 95 then "thunderstorm"
+        else "unknown" end;
+    . as $d
+    | "\($d.city // "Unknown location"): \($d.current.temperature_2m)\($d.current_units.temperature_2m), \($d.current.weather_code | condition), feels like \($d.current.apparent_temperature)\($d.current_units.apparent_temperature)",
+      "Humidity \($d.current.relative_humidity_2m)\($d.current_units.relative_humidity_2m), wind \($d.current.wind_speed_10m) \($d.current_units.wind_speed_10m)",
+      "Observed \($d.current.time)",
+      "",
+      "Forecast:",
+      (($d.daily.time | length) as $n
+       | [range(0; $n)
+          | "  \($d.daily.time[.])  \($d.daily.temperature_2m_min[.] | round)°/\($d.daily.temperature_2m_max[.] | round)°  \($d.daily.weather_code[.] | condition)  rain \($d.daily.precipitation_probability_max[.])%"]
+       | .[])
+' "$cache" 2>/dev/null || { echo "Weather cache is unreadable." >&2; exit 1; }

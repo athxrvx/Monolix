@@ -63,9 +63,11 @@ Singleton {
     readonly property int notifMaxPopups: 4
     readonly property int notifWidth: 440
     readonly property string notifStateFile: home + "/.cache/quickshell/notif-dnd"
+    readonly property string notifHistoryFile: home + "/.cache/quickshell/notif-history.json"
+    readonly property string powerAutomationStateFile: home + "/.cache/quickshell/power-automation.json"
 
-    // Calendar todos are stored here (JSON) so they survive a restart
-    readonly property string todoStateFile: home + "/.config/kuro/task.md"
+    // Calendar todos are stored as Markdown in Documents/Tasks.
+    readonly property string todoStateFile: home + "/Documents/Tasks/Todo.md"
 
     // ── Hyprland ─────────────────────────────────────────────────────
     // The Appearance page writes values to this file. To make it permanent, add

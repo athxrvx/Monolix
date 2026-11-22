@@ -51,15 +51,17 @@
     noDisplay = true;
   };
   xdg.desktopEntries.nvim = {
-    name = "Neovim wrapper";
-    exec = "monovim";
+    name = "Neovim";
+    exec = "kitty -e nvim";
     type = "Application";
+    terminal = false;
     noDisplay = true;
   };
   xdg.desktopEntries.neovim = {
-    name = "Neovim wrapper";
-    exec = "monovim";
+    name = "Neovim";
+    exec = "kitty -e nvim";
     type = "Application";
+    terminal = false;
     noDisplay = true;
   };
   xdg.desktopEntries.ranger = {

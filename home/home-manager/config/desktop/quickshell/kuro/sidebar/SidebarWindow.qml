@@ -1,96 +1,267 @@
-// Persistent two-tab Kuro sidebar: local Ollama chat and ani-cli anime search.
+// Kuro AI sidebar.
 
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
-import Quickshell.Hyprland
-import qs.bar
 import qs.config
 import qs.components
+import qs.services
 
-PanelWindow {
+PopupWindow {
     id: root
 
     property bool opened: false
-    property int activeTab: 0
+    property var barWindow: null
+    property var target: null
     property string modelName: ""
     property var models: []
     property bool modelPickerOpen: false
     property string modelStatus: "Checking Ollama…"
+    property string ollamaServiceStatus: "unknown"
+    property bool ollamaActive: false
+    property bool ollamaStateKnown: false
+    property bool ollamaServiceBusy: false
+    property string ollamaServiceError: ""
     property var messages: []
+    property var modelMessages: []
+    property var actionQueue: []
+    property var activeAction: null
     property bool chatBusy: false
     property string chatError: ""
     property var pendingAction: null
-    property string animeStatus: "Search with ani-cli, choose a series and episode, then mpv plays it."
-    property var pendingAniArgs: []
-    property bool animeMenuMode: false
-    property string animeMenuPrompt: ""
-    property string animeMenuInputPath: ""
-    property string animeMenuOutputPath: ""
-    property var animeChoices: []
-    property string animeFilter: ""
-    readonly property var visibleAnimeChoices: animeChoices.filter(item =>
-        animeFilter.trim() === "" || String(item).toLowerCase().includes(animeFilter.trim().toLowerCase()))
-
-    screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
-    visible: opened || closeTimer.running
-    anchors { top: true; bottom: true; left: true }
-    margins {
-        top: BarState.layout.height + (BarState.layout.margin.top ?? 0) + Theme.popupGap
-        bottom: 12
-        left: 12
-    }
-    implicitWidth: 460
+    anchor.window: root.barWindow
+    visible: opened
+    grabFocus: true
+    implicitWidth: Math.min(460, (barWindow?.width ?? 484) - Theme.popupGap * 2)
+    implicitHeight: Math.max(360, Math.min(680, (barWindow?.screen?.height ?? 768) - anchor.rect.y - 16))
     color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell-sidebar"
-    WlrLayershell.keyboardFocus: opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    onVisibleChanged: {
+        if (visible && opened) focusActiveInput();
+        else if (!visible && opened && BarPopup.open && BarPopup.kind === "ai") BarPopup.close();
+    }
 
-    function toggle() { opened ? close() : open() }
-    function open() {
+    function toggle() { opened ? close() : open(target, barWindow) }
+    function syncFromBar() {
+        if (BarPopup.open && BarPopup.kind === "ai" && BarPopup.target && BarPopup.barWindow)
+            open(BarPopup.target, BarPopup.barWindow);
+        else if (opened)
+            close();
+    }
+    function place() {
+        if (!target || !barWindow) return;
+        const p = target.mapToItem(null, target.width / 2, target.height);
+        const x = Math.round(p.x - implicitWidth / 2);
+        const edge = Theme.popupGap;
+        const maxX = Math.max(edge, barWindow.width - implicitWidth - edge);
+        anchor.rect.x = Math.max(edge, Math.min(x, maxX));
+        anchor.rect.y = Math.round(p.y + Theme.popupGap);
+    }
+    function focusActiveInput() {
+        Qt.callLater(() => {
+            if (!root.opened || !root.visible) return;
+            composer.forceActiveFocus();
+            composer.cursorPosition = composer.length;
+        });
+    }
+    function open(nextTarget, nextBarWindow) {
+        if (nextTarget) target = nextTarget;
+        if (nextBarWindow) barWindow = nextBarWindow;
+        if (!target || !barWindow) return;
+        place();
         opened = true;
-        if (activeTab === 0 && models.length === 0) refreshModels();
-        Qt.callLater(() => body.forceActiveFocus());
+        refreshOllamaService();
+        // Recover after an Ollama restart when the model list is empty.
+        if (models.length === 0) refreshModels();
+        focusActiveInput();
     }
     function close() {
-        if (animeMenuMode) finishAnimeMenu("");
         opened = false;
-        closeTimer.restart();
-    }
-    function selectTab(index) {
-        activeTab = index;
-        modelPickerOpen = false;
-        if (index === 0 && models.length === 0) refreshModels();
+        if (BarPopup.open && BarPopup.kind === "ai") BarPopup.close();
     }
     function refreshModels() {
+        if (!ollamaStateKnown) {
+            modelStatus = "Checking Ollama service…";
+            refreshOllamaService();
+            return;
+        }
+        if (!ollamaActive) {
+            modelStatus = "Ollama is stopped. Turn it on above to chat.";
+            return;
+        }
+        if (modelsProc.running) return;
         modelStatus = "Loading installed models…";
         modelsProc.command = ["curl", "-fsS", "http://127.0.0.1:11434/api/tags"];
         modelsProc.running = true;
     }
+    function refreshOllamaService() {
+        if (!ollamaStateProc.running) ollamaStateProc.running = true;
+    }
+    function toggleOllamaService() {
+        if (ollamaServiceBusy) return;
+        ollamaServiceError = "";
+        ollamaServiceBusy = true;
+        ollamaActionProc.command = ["systemctl", "--no-block", ollamaActive ? "stop" : "start", "ollama.service"];
+        ollamaActionProc.running = true;
+    }
+    onOllamaActiveChanged: {
+        if (ollamaActive) {
+            modelStatus = "Ollama is starting…";
+            ollamaReadyTimer.restart();
+        } else if (ollamaStateKnown) {
+            modelStatus = "Ollama is stopped. Turn it on above to chat.";
+        }
+    }
     function sendChat() {
         const prompt = composer.text.trim();
         const model = modelName.trim();
-        if (prompt === "" || model === "" || chatBusy || pendingAction !== null) return;
+        if (!ollamaActive) {
+            chatError = "Ollama is stopped. Turn it on above to chat.";
+            return;
+        }
+        if (prompt === "") return;
+        if (model === "") {
+            chatError = "No model selected yet. Open Models and choose one.";
+            return;
+        }
+        if (pendingAction !== null) {
+            chatError = "Approve or cancel the pending action first.";
+            return;
+        }
+        if (chatBusy) {
+            chatError = "Ollama is still answering. Wait for it to finish.";
+            return;
+        }
         messages = messages.concat([{ role: "user", content: prompt }]);
+        modelMessages = modelMessages.concat([{ role: "user", content: prompt }]);
         composer.text = "";
         requestChat();
     }
     function requestChat() {
         const model = modelName.trim();
-        if (model === "" || chatBusy) return;
+        if (!ollamaActive || model === "" || chatBusy) return;
         chatBusy = true;
         chatError = "";
         const payload = JSON.stringify({
             model: model,
-            messages: [{ role: "system", content: "You are the Kuro desktop shell assistant. You may request only the provided theme, font, or system-update actions. Never request or suggest arbitrary commands or scripts. Action requests are proposals: wait for the user's approval before saying they ran." }].concat(messages),
+            messages: [{ role: "system", content: "You are Kuro, the local AI navigator built into the Kuro desktop shell. Personality: warm, sharp, concise, quietly playful, and practical. You speak like a trusted navigator: direct about tradeoffs, calm under pressure, never dramatic, and you keep answers short unless the user asks for detail. You may request only the provided allowlisted actions: theme, font, wallpaper, night light, focus mode, timers, containers, YouTube, app launching, brightness, and read-only status lookups (media, system stats, disk, weather, todos, containers, and file search). Read-only status lookups run immediately without approval. Never invent commands, scripts, file paths, or results. All other action requests are proposals: recommend the closest tool, wait for the user's approval, and never claim an action ran before it did. After a script runs, base your reply on its returned output and exit status; approval alone is not success. If the script says no verification output was produced, do not claim the requested setting or change was confirmed; report only that the script exited successfully without confirming the resulting state." }].concat(modelMessages),
             stream: false,
             tools: [
-                { type: "function", function: { name: "kuro_set_theme", description: "Request a Kuro colorscheme change. Ask for approval before using.", parameters: { type: "object", properties: { theme: { type: "string", enum: Config.kuroSchemes.map(item => item.id) } }, required: ["theme"] } } },
-                { type: "function", function: { name: "kuro_set_font", description: "Request an approved terminal, shell, and bar font change. Ask for approval before using.", parameters: { type: "object", properties: { family: { type: "string", enum: ["JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font", "FiraCode Nerd Font", "Iosevka Nerd Font"] } }, required: ["family"] } } },
-                { type: "function", function: { name: "kuro_update_system", description: "Request a full Arch Linux system update. This is a privileged action and always requires explicit user approval.", parameters: { type: "object", properties: {}, additionalProperties: false } } }
+                { type: "function", function: {
+                    name: "kuro_set_theme",
+                    description: "Change the Kuro colorscheme. Available ids: " + Config.kuroSchemes.map(item => item.id).join(", ") + ". rose-pine is the only light theme; every other available theme is dark. Use the id, not the display name. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        theme: { type: "string", enum: Config.kuroSchemes.map(item => item.id), description: "Theme id. rose-pine is light; the rest are dark." }
+                    }, required: ["theme"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_set_font",
+                    description: "Change the UI, shell, bar, and terminal font to one approved Nerd Font: JetBrainsMono, CaskaydiaCove, FiraCode, or Iosevka. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        family: { type: "string", enum: ["JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font", "FiraCode Nerd Font", "Iosevka Nerd Font"], description: "Exact approved font family name." }
+                    }, required: ["family"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_random_wallpaper",
+                    description: "Apply a random image from the user's configured wallpaper folder. Only the wallpaper changes; the colorscheme stays the same. Ask for approval before using.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_night_light",
+                    description: "Control night light via hyprsunset. on = 4500K, warm = 3500K (best at night), cool = 5000K (best in daylight), off = stop, toggle = flip current state. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        mode: { type: "string", enum: ["on", "off", "warm", "cool", "toggle"], description: "Night light mode and warmth." }
+                    }, required: ["mode"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_focus_mode",
+                    description: "Focus mode. on = enable Do Not Disturb and block idle sleep; off = restore both; toggle = flip. Use it for deep work, study, or meetings. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        mode: { type: "string", enum: ["on", "off", "toggle"], description: "Whether to enable, disable, or flip focus mode." }
+                    }, required: ["mode"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_set_timer",
+                    description: "Set one one-shot timer that sends a desktop notification when it finishes. Timers run independently and can overlap. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        seconds: { type: "integer", minimum: 1, maximum: 86400, description: "Duration in seconds (1 second to 24 hours)." },
+                        label: { type: "string", pattern: "^[A-Za-z0-9 _-]{0,48}$", description: "Optional short label shown in the notification; letters, numbers, spaces, _ and -." }
+                    }, required: ["seconds"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_open_container",
+                    description: "Open an existing distrobox/podman container in a floating terminal. Use the exact lowercase container name; containers must already exist. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        name: { type: "string", pattern: "^[a-z][a-z0-9_.-]{0,62}$", description: "Exact existing container name, e.g. dev." }
+                    }, required: ["name"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_container_install",
+                    description: "Install packages inside an existing container. Pick the manager that matches the distro: apt = Debian/Ubuntu, dnf = Fedora/RHEL, pacman = Arch, apk = Alpine. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        container: { type: "string", pattern: "^[a-z][a-z0-9_.-]{0,62}$", description: "Exact existing container name." },
+                        manager: { type: "string", enum: ["apt", "dnf", "pacman", "apk"], description: "Package manager that matches the container distro." },
+                        packages: { type: "array", items: { type: "string", pattern: "^[a-z0-9][a-z0-9+._-]{0,63}$" }, minItems: 1, maxItems: 8, description: "One to eight lowercase package names." }
+                    }, required: ["container", "manager", "packages"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_youtube",
+                    description: "Search YouTube and play the first matching video in mpv, or play a direct YouTube URL. Use this for music, trailers, tutorials, or 'play X' requests. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        query: { type: "string", minLength: 1, maxLength: 160, description: "Search terms or a full YouTube URL." }
+                    }, required: ["query"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_open_app",
+                    description: "Launch an installed desktop application. Use its short .desktop id without the suffix, for example firefox, kitty, dolphin, discord, spotify, code. Do not guess an id; ask the user if unsure. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        app: { type: "string", pattern: "^[A-Za-z0-9._-]{1,80}$", description: "Installed desktop id, with or without .desktop." }
+                    }, required: ["app"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_brightness",
+                    description: "Change screen brightness. Use a percentage from 1 to 100 for an absolute level, or up/down to step by 10 percent. Ask for approval before using.",
+                    parameters: { type: "object", properties: {
+                        value: { type: "string", pattern: "^(up|down|[0-9]{1,3})$", description: "'up', 'down', or a percentage from 1 to 100." }
+                    }, required: ["value"], additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_media_status",
+                    description: "Read-only. Report the active media player, playback state, and current track. Use when the user asks what is playing. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_system_stats",
+                    description: "Read-only. Report CPU load, memory usage, the warmest temperature sensor, and GPU utilization when available. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_disk_usage",
+                    description: "Read-only. Report filesystem usage for mounted disks. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_weather",
+                    description: "Read-only. Report the cached current weather and five-day forecast. Use for weather questions. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_todo_list",
+                    description: "Read-only. List open tasks from the user's task file, sorted by date. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_container_list",
+                    description: "Read-only. List podman containers and distrobox containers. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {}, additionalProperties: false }
+                } },
+                { type: "function", function: {
+                    name: "kuro_find_file",
+                    description: "Read-only. Find files by name under the user's home directory. Returns at most 25 matches. Use a short filename fragment. Runs immediately without approval.",
+                    parameters: { type: "object", properties: {
+                        query: { type: "string", minLength: 1, maxLength: 80, description: "Filename fragment, letters or numbers, one line." }
+                    }, required: ["query"], additionalProperties: false }
+                } }
             ]
         });
         chatProc.command = [
@@ -100,119 +271,222 @@ PanelWindow {
         ];
         chatProc.running = true;
     }
+    function actionForTool(name, args) {
+        const validContainer = value => /^[a-z][a-z0-9_.-]{0,62}$/.test(String(value ?? ""));
+        const validPackage = value => /^[a-z0-9][a-z0-9+._-]{0,63}$/.test(String(value ?? ""));
+        if (name === "kuro_set_theme") {
+            const theme = Config.kuroSchemes.find(item => item.id === String(args.theme ?? ""));
+            if (theme) return { name, title: "Change theme to " + theme.name, script: "ai-theme", args: [theme.id] };
+        } else if (name === "kuro_set_font") {
+            const family = String(args.family ?? "");
+            if (["JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font", "FiraCode Nerd Font", "Iosevka Nerd Font"].includes(family))
+                return { name, title: "Change shell, bar, and terminal font", detail: family, script: "ai-font", args: [family] };
+        } else if (name === "kuro_random_wallpaper") {
+            return { name, title: "Apply a random wallpaper", script: "ai-wallpaper", args: [Config.wallpaperDir] };
+        } else if (name === "kuro_night_light") {
+            const mode = String(args.mode ?? "");
+            if (["on", "off", "warm", "cool", "toggle"].includes(mode))
+                return { name, title: "Night light: " + mode, script: "ai-nightlight", args: [mode] };
+        } else if (name === "kuro_focus_mode") {
+            const mode = String(args.mode ?? "");
+            if (["on", "off", "toggle"].includes(mode))
+                return { name, title: "Focus mode: " + mode, script: "ai-focus", args: [mode] };
+        } else if (name === "kuro_set_timer") {
+            const seconds = Number(args.seconds);
+            const label = String(args.label ?? "").trim() || "Timer";
+            if (Number.isInteger(seconds) && seconds >= 1 && seconds <= 86400 &&
+                label.length <= 48 && /^[A-Za-z0-9 _-]*$/.test(label))
+                return { name, title: "Set a timer for " + seconds + "s", detail: label,
+                         script: "ai-timer", args: ["set", String(seconds), label] };
+        } else if (name === "kuro_open_container") {
+            const container = String(args.name ?? "");
+            if (validContainer(container))
+                return { name, title: "Open container " + container, script: "ai-container-open",
+                         args: [container], terminal: true };
+        } else if (name === "kuro_container_install") {
+            const container = String(args.container ?? "");
+            const manager = String(args.manager ?? "");
+            const packages = Array.isArray(args.packages) ? args.packages.map(item => String(item)) : [];
+            if (validContainer(container) && ["apt", "dnf", "pacman", "apk"].includes(manager) &&
+                packages.length >= 1 && packages.length <= 8 && packages.every(validPackage))
+                return { name, title: "Install packages in " + container,
+                         detail: manager + ": " + packages.join(" "), script: "ai-container-install",
+                         args: [container, manager].concat(packages), terminal: true };
+        } else if (name === "kuro_youtube") {
+            const query = String(args.query ?? "").trim();
+            if (query !== "" && query.length <= 160 && !/[\r\n]/.test(query))
+                return { name, title: "Play YouTube: " + query, detail: "first search result",
+                         script: "ai-youtube", args: [query] };
+        } else if (name === "kuro_open_app") {
+            const app = String(args.app ?? "");
+            if (/^[A-Za-z0-9._-]{1,80}$/.test(app))
+                return { name, title: "Open application " + app, script: "ai-open-app", args: [app] };
+        } else if (name === "kuro_brightness") {
+            const value = String(args.value ?? "");
+            if (value === "up" || value === "down" ||
+                (/^[0-9]{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 100))
+                return { name, title: "Brightness: " + value, script: "ai-brightness", args: [value] };
+        } else if (name === "kuro_media_status") {
+            return { name, title: "Read media status", script: "ai-media-status", args: [], readOnly: true };
+        } else if (name === "kuro_system_stats") {
+            return { name, title: "Read system statistics", script: "ai-stats", args: [], readOnly: true };
+        } else if (name === "kuro_disk_usage") {
+            return { name, title: "Read disk usage", script: "ai-disk", args: [], readOnly: true };
+        } else if (name === "kuro_weather") {
+            return { name, title: "Read cached weather", script: "ai-weather", args: [], readOnly: true };
+        } else if (name === "kuro_todo_list") {
+            return { name, title: "List open tasks", script: "ai-todo-list", args: [], readOnly: true };
+        } else if (name === "kuro_container_list") {
+            return { name, title: "List containers", script: "ai-container-list", args: [], readOnly: true };
+        } else if (name === "kuro_find_file") {
+            const query = String(args.query ?? "").trim();
+            if (query !== "" && query.length <= 80 && !/[\r\n]/.test(query))
+                return { name, title: "Search files: " + query, detail: "under home",
+                         script: "ai-find-file", args: [query], readOnly: true };
+        }
+        return null;
+    }
+
     function receiveChatResponse(result) {
         chatBusy = false;
-        const calls = result.message?.tool_calls ?? [];
+        const modelMessage = result.message ?? {};
+        const calls = modelMessage.tool_calls ?? [];
+        modelMessages = modelMessages.concat([modelMessage]);
         if (calls.length > 0) {
-            const call = calls[0].function ?? {};
-            let args = call.arguments ?? {};
-            if (typeof args === "string") {
-                try { args = JSON.parse(args); } catch (e) { args = {}; }
-            }
-            const name = String(call.name ?? "");
-            let action = null;
-            if (name === "kuro_set_theme") {
-                const theme = Config.kuroSchemes.find(item => item.id === String(args.theme ?? ""));
-                if (theme) action = { name: name, title: "Change theme to " + theme.name, script: "ai-theme", args: [theme.id] };
-            } else if (name === "kuro_set_font") {
-                const family = String(args.family ?? "");
-                if (["JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font", "FiraCode Nerd Font", "Iosevka Nerd Font"].includes(family))
-                    action = { name: name, title: "Change shell, bar, and terminal font", detail: family, script: "ai-font", args: [family] };
-            } else if (name === "kuro_update_system") {
-                action = { name: name, title: "Update the Arch Linux system", script: "ai-update", args: [] };
-            }
-            if (!action) {
-                chatError = "That requested action is unavailable or has invalid arguments.";
-                if (result.message?.content) messages = messages.concat([{ role: "assistant", content: result.message.content }]);
-                return;
-            }
-            pendingAction = action;
-            messages = messages.concat([{ role: "assistant", content: result.message?.content || ("I can " + action.title + (action.detail ? " · " + action.detail : "") + ". Choose whether to run it below.") }]);
+            actionQueue = calls.map(call => {
+                const fn = call.function ?? {};
+                let args = fn.arguments ?? {};
+                if (typeof args === "string") {
+                    try { args = JSON.parse(args); } catch (e) { args = {}; }
+                }
+                const name = String(fn.name ?? "unknown_tool");
+                return actionForTool(name, args) ?? { name, invalid: true };
+            });
+            processActionQueue();
             return;
         }
         messages = messages.concat([
-            { role: "assistant", content: result.message?.content ?? "Ollama returned an empty response." }
+            { role: "assistant", content: modelMessage.content ?? "Ollama returned an empty response." }
         ]);
     }
+
+    function appendToolResult(action, content) {
+        modelMessages = modelMessages.concat([{
+            role: "tool", tool_name: action.name, content: String(content)
+        }]);
+    }
+
+    function processActionQueue() {
+        if (pendingAction !== null || activeAction !== null) return;
+        if (actionQueue.length === 0) {
+            chatBusy = false;
+            requestChat();
+            return;
+        }
+        const action = actionQueue[0];
+        if (action.invalid) {
+            actionQueue = actionQueue.slice(1);
+            appendToolResult(action, "Rejected: this action is not available or its arguments were invalid.");
+            processActionQueue();
+            return;
+        }
+        if (action.readOnly === true) {
+            actionQueue = actionQueue.slice(1);
+            runActionScript(action);
+            return;
+        }
+        chatBusy = false;
+        pendingAction = action;
+        const prompt = "I can " + action.title + (action.detail ? " · " + action.detail : "") + ". Choose whether to run it below.";
+        messages = messages.concat([{ role: "assistant", content: action.prompt || prompt }]);
+    }
+
+    function runActionScript(action) {
+        if (aiActionProc.running) {
+            appendToolResult(action, "Could not run: another Kuro script is already running.");
+            processActionQueue();
+            return;
+        }
+        activeAction = action;
+        chatBusy = true;
+        chatError = "";
+        aiActionProc.outputText = "";
+        aiActionProc.errorText = "";
+        aiActionProc.command = [Config.home + "/.config/quickshell/shell/bin/skills/" + action.script]
+            .concat(action.args ?? []);
+        aiActionProc.running = true;
+    }
+
     function approveAction() {
         if (!pendingAction) return;
         const action = pendingAction;
         pendingAction = null;
-        const script = Config.home + "/.config/quickshell/shell/bin/" + action.script;
-        if (action.script === "ai-update") {
-            Quickshell.execDetached(Config.popupTerminal.concat([script]));
-            messages = messages.concat([{ role: "assistant", content: "Opened the approved system update in a floating terminal." }]);
+        actionQueue = actionQueue.slice(1);
+        if (action.terminal === true) {
+            Quickshell.execDetached(Config.popupTerminal.concat([
+                Config.home + "/.config/quickshell/shell/bin/skills/" + action.script
+            ], action.args ?? []));
+            appendToolResult(action, "An interactive terminal was opened for this action. Its completion is not yet confirmed.");
+            messages = messages.concat([{ role: "assistant", content: "Opened a terminal for that action. Its result will appear there." }]);
+            processActionQueue();
             return;
         }
-        aiActionProc.command = [script].concat(action.args ?? []);
-        aiActionProc.running = true;
+        runActionScript(action);
     }
+
     function rejectAction() {
         if (!pendingAction) return;
+        const action = pendingAction;
         pendingAction = null;
-        messages = messages.concat([{ role: "assistant", content: "Action cancelled." }]);
-    }
-    function startAnimeSearch() {
-        const query = animeQuery.text.trim();
-        if (query === "") {
-            animeStatus = "Enter an anime title to search.";
-            return;
-        }
-        pendingAniArgs = [query];
-        animeStatus = "Searching anime…";
-        aniCheck.command = ["sh", "-c", "test -x \"$HOME/.config/quickshell/shell/bin/ani-cli\" && command -v mpv >/dev/null 2>&1 && command -v script >/dev/null 2>&1"];
-        aniCheck.running = true;
-    }
-    function continueAnime() {
-        pendingAniArgs = ["--continue"];
-        animeStatus = "Opening ani-cli history…";
-        aniCheck.command = ["sh", "-c", "test -x \"$HOME/.config/quickshell/shell/bin/ani-cli\" && command -v mpv >/dev/null 2>&1 && command -v script >/dev/null 2>&1"];
-        aniCheck.running = true;
-    }
-    function shellQuote(value) {
-        return "'" + String(value).replace(/'/g, "'\\''") + "'";
-    }
-    function runAniCli() {
-        const script = Config.home + "/.config/quickshell/shell/bin/ani-cli";
-        const menu = Config.home + "/.config/quickshell/shell/bin/ani-menu";
-        const command = ["env", "ANI_CLI_MENU=" + shellQuote(menu), "ANI_CLI_PLAYER=mpv",
-            shellQuote(script)].concat(pendingAniArgs.map(shellQuote)).join(" ");
-        Quickshell.execDetached(["script", "-q", "-e", "-c", command, "/dev/null"]);
-    }
-    function requestAnimeMenu(prompt, inputPath, outputPath) {
-        opened = true;
-        activeTab = 1;
-        animeMenuMode = true;
-        animeMenuPrompt = prompt;
-        animeMenuInputPath = inputPath;
-        animeMenuOutputPath = outputPath;
-        animeFilter = "";
-        animeChoices = [];
-        animeOptionsProc.command = ["cat", inputPath];
-        animeOptionsProc.running = true;
-        Qt.callLater(() => animeFilterField.forceFocus());
-        return "ok";
-    }
-    function acceptAnimeChoice() {
-        const choices = visibleAnimeChoices;
-        if (choices.length > 0) finishAnimeMenu(choices[0]);
-    }
-    function finishAnimeMenu(choice) {
-        const outputPath = animeMenuOutputPath;
-        if (!animeMenuMode || outputPath === "") return;
-        animeMenuMode = false;
-        animeMenuOutputPath = "";
-        animeStatus = choice === "" ? "Selection cancelled." : "Selected " + String(choice).replace(/^\s*\d+\s+/, "");
-        animeResponseProc.command = [
-            "sh", "-c", "printf '%s\\n' \"$1\" > \"$2\"", "sh", String(choice), outputPath
-        ];
-        animeResponseProc.running = true;
+        actionQueue = actionQueue.slice(1);
+        appendToolResult(action, "The user declined this action; it was not run.");
+        messages = messages.concat([{ role: "assistant", content: "Cancelled; I did not run it." }]);
+        processActionQueue();
     }
 
     Timer {
-        id: closeTimer
-        interval: 190
-        onTriggered: {}
+    }
+
+    Timer {
+        interval: 4000
+        repeat: true
+        running: root.opened || root.ollamaServiceStatus === "activating"
+        onTriggered: root.refreshOllamaService()
+    }
+
+    Timer {
+        id: ollamaReadyTimer
+        interval: 1200
+        onTriggered: if (root.ollamaActive) root.refreshModels()
+    }
+
+    Process {
+        id: ollamaStateProc
+        command: ["systemctl", "show", "--property=ActiveState", "--value", "ollama.service"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.ollamaServiceStatus = text.trim() || "unknown";
+                root.ollamaStateKnown = true;
+                root.ollamaActive = root.ollamaServiceStatus === "active";
+                if (root.ollamaActive && root.models.length === 0)
+                    root.refreshModels();
+                if (!root.ollamaActive)
+                    root.modelStatus = root.ollamaServiceStatus === "activating"
+                        ? "Ollama is starting…" : "Ollama is stopped. Turn it on above to chat.";
+            }
+        }
+    }
+
+    Process {
+        id: ollamaActionProc
+        stderr: StdioCollector { onStreamFinished: root.ollamaServiceError = text.trim() }
+        onExited: (exitCode, status) => {
+            root.ollamaServiceBusy = false;
+            if (exitCode !== 0) {
+                root.ollamaServiceError = root.ollamaServiceError || "Could not change Ollama service state.";
+            }
+            root.refreshOllamaService();
+        }
     }
 
     Process {
@@ -275,54 +549,44 @@ PanelWindow {
 
     Process {
         id: aiActionProc
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim() !== "") root.chatError = text.trim()
-        }
-        onExited: exitCode => {
-            if (exitCode === 0)
-                root.messages = root.messages.concat([{ role: "assistant", content: "Approved action completed." }]);
-            else
-                root.chatError = "The approved action failed (exit " + exitCode + ").";
-        }
-    }
-
-    Process {
-        id: aniCheck
-        onExited: exitCode => {
-            if (exitCode === 0) {
-                root.runAniCli();
-                root.animeStatus = "Ani-cli is searching. Anime and episode choices appear here; playback uses MPV.";
-            } else {
-                root.animeStatus = "Ani-cli, mpv, or the util-linux script tool is missing.";
-            }
-        }
-    }
-
-    Process {
-        id: animeOptionsProc
+        property string outputText: ""
+        property string errorText: ""
         stdout: StdioCollector {
-            onStreamFinished: {
-                if (!root.animeMenuMode) return;
-                root.animeChoices = text.split("\n").filter(line => line.trim() !== "");
-                root.animeFilter = "";
-                Qt.callLater(() => animeFilterField.forceFocus());
-            }
+            waitForEnd: true
+            onStreamFinished: aiActionProc.outputText = text
+        }
+        stderr: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: aiActionProc.errorText = text
+        }
+        onExited: exitCode => {
+            const action = root.activeAction;
+            root.activeAction = null;
+            root.chatBusy = false;
+            if (!action) return;
+
+            const output = aiActionProc.outputText.trim();
+            const error = aiActionProc.errorText.trim();
+            const ok = exitCode === 0;
+            const detail = ok
+                ? (output || "No verification output was produced.")
+                : (error || output || "The script did not report a reason.");
+            root.appendToolResult(action,
+                (ok ? "Script exited successfully." : "Script failed with exit status " + exitCode + ".")
+                + "\n" + detail.slice(0, 4000));
+            if (!ok) root.chatError = action.title + " failed (exit " + exitCode + ").";
+            root.processActionQueue();
         }
     }
 
-    Process { id: animeResponseProc }
 
     Rectangle {
         id: surface
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        width: parent.width
-        x: root.opened ? 0 : -width
+        anchors.fill: parent
         color: Theme.bg
         border.width: 1
         border.color: Theme.accent
         clip: true
-        Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
         Item {
             id: body
@@ -347,35 +611,46 @@ PanelWindow {
                 anchors.margins: 16
                 spacing: 12
 
-                RowLayout {
+                Rectangle {
                     Layout.fillWidth: true
-                    Text {
-                        Layout.fillWidth: true
-                        text: "KURO  /  SIDEBAR"
-                        color: Theme.text
-                        font.family: Theme.font
-                        font.pixelSize: 15
-                        font.letterSpacing: 1
-                    }
-                    TextButton { text: Icons.close; onClicked: root.close() }
-                }
+                    implicitHeight: 50
+                    color: Theme.bgAlt
+                    border.color: Theme.border
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    TextButton {
-                        Layout.fillWidth: true
-                        text: "Ollama chat"
-                        primary: root.activeTab === 0
-                        sharp: true
-                        onClicked: root.selectTab(0)
-                    }
-                    TextButton {
-                        Layout.fillWidth: true
-                        text: "Anime"
-                        primary: root.activeTab === 1
-                        sharp: true
-                        onClicked: root.selectTab(1)
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 10
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Text {
+                                text: "OLLAMA SERVICE"
+                                color: Theme.text
+                                font.family: Theme.font
+                                font.pixelSize: 10
+                                font.letterSpacing: 1
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.ollamaServiceError !== "" ? root.ollamaServiceError
+                                    : root.ollamaServiceBusy ? "Changing service state…"
+                                    : root.ollamaServiceStatus === "activating" ? "Starting local model service…"
+                                    : root.ollamaActive ? "Running · RTX 4050 available"
+                                    : "Stopped · GPU stays idle"
+                                color: root.ollamaServiceError !== "" ? Theme.danger : Theme.muted
+                                font.family: Theme.font
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Switch {
+                            checked: root.ollamaActive || root.ollamaServiceStatus === "activating"
+                            enabled: !root.ollamaServiceBusy && root.ollamaServiceStatus !== "activating"
+                            onToggled: root.toggleOllamaService()
+                        }
                     }
                 }
 
@@ -388,56 +663,10 @@ PanelWindow {
                 StackLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    currentIndex: root.activeTab === 1 && root.animeMenuMode ? 2 : root.activeTab
+                    currentIndex: 0
 
                     ColumnLayout {
                         spacing: 10
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            InputField {
-                                id: modelField
-                                text: root.modelName
-                                placeholder: "Ollama model name"
-                                onTextChanged: root.modelName = text
-                            }
-                            TextButton {
-                                text: "Models"
-                                onClicked: {
-                                    root.modelPickerOpen = !root.modelPickerOpen;
-                                    if (root.models.length === 0) root.refreshModels();
-                                }
-                            }
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: root.modelStatus
-                            color: Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 11
-                            elide: Text.ElideRight
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            visible: root.modelPickerOpen
-                            spacing: 3
-                            Repeater {
-                                model: root.models
-                                delegate: TextButton {
-                                    required property string modelData
-                                    Layout.fillWidth: true
-                                    text: modelData
-                                    sharp: true
-                                    onClicked: {
-                                        root.modelName = modelData;
-                                        modelField.text = modelData;
-                                        root.modelPickerOpen = false;
-                                    }
-                                }
-                            }
-                        }
 
                         Flickable {
                             id: chatScroll
@@ -454,38 +683,98 @@ PanelWindow {
                                 width: chatScroll.width
                                 spacing: 8
 
-                                Text {
+                                ColumnLayout {
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 210
                                     visible: root.messages.length === 0
-                                    text: "Local chat via Ollama. Choose a model, then send a message."
-                                    color: Theme.muted
-                                    font.family: Theme.font
-                                    font.pixelSize: 12
-                                    wrapMode: Text.Wrap
+                                    spacing: 8
+
+                                    Item { Layout.fillHeight: true }
+
+                                    Rectangle {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.preferredWidth: 48
+                                        Layout.preferredHeight: 48
+                                        color: Theme.surface
+                                        border.color: Theme.border
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: Icons.bot
+                                            color: Theme.accent
+                                            font.family: Theme.iconFont
+                                            font.pixelSize: 26
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: root.modelName === "" ? "Choose a model to begin" : "Ready when you are"
+                                        color: Theme.text
+                                        font.family: Theme.font
+                                        font.pixelSize: 13
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        Layout.leftMargin: 24
+                                        Layout.rightMargin: 24
+                                        text: "Your conversation stays with your local Ollama model."
+                                        color: Theme.muted
+                                        font.family: Theme.font
+                                        font.pixelSize: 11
+                                        horizontalAlignment: Text.AlignHCenter
+                                        wrapMode: Text.Wrap
+                                    }
+
+                                    Item { Layout.fillHeight: true }
                                 }
 
                                 Repeater {
                                     model: root.messages
                                     delegate: Rectangle {
                                         required property var modelData
+                                        readonly property bool fromUser: modelData.role === "user"
                                         Layout.fillWidth: true
-                                        implicitHeight: messageLayout.implicitHeight + 18
-                                        color: modelData.role === "user" ? Theme.surface : Theme.bgAlt
+                                        implicitHeight: messageLayout.implicitHeight + 20
+                                        color: fromUser ? Theme.surface : Theme.bgAlt
                                         border.color: Theme.border
+                                        border.width: 1
                                         radius: 0
+
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.bottom: parent.bottom
+                                            width: 2
+                                            color: fromUser ? Theme.accent : Theme.border
+                                        }
 
                                         ColumnLayout {
                                             id: messageLayout
                                             anchors.fill: parent
-                                            anchors.margins: 9
-                                            spacing: 4
-                                            Text {
-                                                text: modelData.role === "user" ? "YOU" : "OLLAMA"
-                                                color: modelData.role === "user" ? Theme.accent : Theme.muted
-                                                font.family: Theme.font
-                                                font.pixelSize: 10
-                                                font.letterSpacing: 1
+                                            anchors.leftMargin: 12
+                                            anchors.rightMargin: 10
+                                            anchors.topMargin: 9
+                                            anchors.bottomMargin: 9
+                                            spacing: 6
+
+                                            RowLayout {
+                                                spacing: 6
+                                                Text {
+                                                    text: fromUser ? Icons.user : Icons.bot
+                                                    color: fromUser ? Theme.accent : Theme.muted
+                                                    font.family: Theme.iconFont
+                                                    font.pixelSize: 12
+                                                }
+                                                Text {
+                                                    text: fromUser ? "YOU" : "KURO"
+                                                    color: fromUser ? Theme.accent : Theme.muted
+                                                    font.family: Theme.font
+                                                    font.pixelSize: 9
+                                                    font.letterSpacing: 1
+                                                }
                                             }
+
                                             Text {
                                                 Layout.fillWidth: true
                                                 text: modelData.content
@@ -547,17 +836,51 @@ PanelWindow {
                             wrapMode: Text.Wrap
                         }
 
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            visible: root.modelPickerOpen
+                            spacing: 3
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.modelStatus
+                                color: Theme.muted
+                                font.family: Theme.font
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+
+                            Repeater {
+                                model: root.models
+                                delegate: TextButton {
+                                    required property string modelData
+                                    Layout.fillWidth: true
+                                    text: modelData
+                                    sharp: true
+                                    onClicked: {
+                                        root.modelName = modelData;
+                                        root.modelPickerOpen = false;
+                                    }
+                                }
+                            }
+                        }
+
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 86
+                            Layout.preferredHeight: 100
                             color: Theme.surface
+                            border.width: 1
                             border.color: composer.activeFocus ? Theme.accent : Theme.border
                             clip: true
 
                             TextEdit {
                                 id: composer
+                                focus: root.opened
                                 anchors.fill: parent
-                                anchors.margins: 10
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                anchors.topMargin: 36
+                                anchors.bottomMargin: 8
                                 color: Theme.text
                                 selectionColor: Theme.selectionBg
                                 selectedTextColor: Theme.selectionFg
@@ -566,216 +889,55 @@ PanelWindow {
                                 wrapMode: TextEdit.Wrap
                                 selectByMouse: true
                                 clip: true
+                                TapHandler {
+                                    gesturePolicy: TapHandler.WithinBounds
+                                    onTapped: composer.forceActiveFocus()
+                                }
                                 Keys.onPressed: event => {
-                                    if ((event.modifiers & Qt.ControlModifier)
-                                        && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+                                    const isEnter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter;
+                                    if (isEnter && !(event.modifiers & Qt.ShiftModifier)) {
                                         root.sendChat();
                                         event.accepted = true;
                                     }
                                 }
-                            }
-                            Text {
-                                anchors.fill: composer
-                                anchors.margins: 10
-                                enabled: false
-                                visible: composer.text === ""
-                                text: "Message Ollama…  Ctrl+Enter to send"
-                                color: Theme.muted
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontSize - 1
-                                wrapMode: Text.Wrap
                             }
                         }
 
                         RowLayout {
                             Layout.fillWidth: true
                             TextButton {
-                                text: "Clear chat"
-                                onClicked: { root.messages = []; root.chatError = ""; root.pendingAction = null; }
+                                text: Icons.cpu
+                                sharp: true
+                                flat: root.modelPickerOpen
+                                onClicked: {
+                                    root.modelPickerOpen = !root.modelPickerOpen;
+                                    if (root.models.length === 0) root.refreshModels();
+                                }
+                            }
+                            TextButton {
+                                text: "Clear"
+                                sharp: true
+                                enabled: !root.chatBusy && root.pendingAction === null
+                                onClicked: {
+                                    root.messages = [];
+                                    root.modelMessages = [];
+                                    root.actionQueue = [];
+                                    root.chatError = "";
+                                }
                             }
                             Item { Layout.fillWidth: true }
                             TextButton {
                                 text: root.chatBusy ? "Thinking…" : "Send"
                                 primary: true
+                                sharp: true
                                 enabled: !root.chatBusy && root.pendingAction === null && root.modelName.trim() !== "" && composer.text.trim() !== ""
                                 onClicked: root.sendChat()
                             }
                         }
                     }
 
-                    ColumnLayout {
-                        spacing: 12
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: "ANIME"
-                            color: Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 11
-                            font.letterSpacing: 1.4
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Search with ani-cli. Choose a title and episode in this sidebar; MPV handles playback."
-                            color: Theme.text
-                            font.family: Theme.font
-                            font.pixelSize: Theme.fontSize - 2
-                            wrapMode: Text.Wrap
-                        }
-
-                        InputField {
-                            id: animeQuery
-                            placeholder: "Anime title"
-                            onAccepted: root.startAnimeSearch()
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            TextButton {
-                                Layout.fillWidth: true
-                                text: "Search anime"
-                                primary: true
-                                onClicked: root.startAnimeSearch()
-                            }
-                            TextButton {
-                                Layout.fillWidth: true
-                                text: "Continue"
-                                onClicked: root.continueAnime()
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: statusText.implicitHeight + 20
-                            color: Theme.surface
-                            border.color: Theme.border
-                            Text {
-                                id: statusText
-                                anchors.fill: parent
-                                anchors.margins: 10
-                                text: root.animeStatus
-                                color: Theme.muted
-                                font.family: Theme.font
-                                font.pixelSize: 11
-                                wrapMode: Text.Wrap
-                            }
-                        }
-
-                        Item { Layout.fillHeight: true }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Search results and episode selection stay in this shell panel. MPV opens for playback."
-                            color: Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 10
-                            wrapMode: Text.Wrap
-                        }
-                    }
-
-                    ColumnLayout {
-                        spacing: 10
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: root.animeMenuPrompt.toUpperCase()
-                            color: Theme.accent
-                            font.family: Theme.font
-                            font.pixelSize: 12
-                            font.letterSpacing: 1
-                            elide: Text.ElideRight
-                        }
-
-                        InputField {
-                            id: animeFilterField
-                            text: root.animeFilter
-                            placeholder: "Filter choices…"
-                            onTextChanged: root.animeFilter = text
-                            onAccepted: root.acceptAnimeChoice()
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            visible: root.visibleAnimeChoices.length === 0
-                            text: root.animeChoices.length === 0 ? "Loading choices…" : "No matching choices."
-                            color: Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 11
-                        }
-
-                        ListView {
-                            id: animeList
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            model: root.visibleAnimeChoices
-                            currentIndex: 0
-                            boundsBehavior: Flickable.StopAtBounds
-                            delegate: Rectangle {
-                                required property string modelData
-                                required property int index
-                                width: ListView.view.width
-                                height: 40
-                                color: animeRowMouse.containsMouse || animeList.currentIndex === index
-                                       ? Theme.surface : "transparent"
-                                border.color: animeRowMouse.containsMouse ? Theme.border : "transparent"
-                                Text {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: modelData.replace(/^\s*\d+\s+/, "")
-                                    color: Theme.text
-                                    font.family: Theme.font
-                                    font.pixelSize: Theme.fontSize - 2
-                                    elide: Text.ElideRight
-                                }
-                                MouseArea {
-                                    id: animeRowMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onEntered: animeList.currentIndex = index
-                                    onClicked: root.finishAnimeMenu(modelData)
-                                }
-                            }
-                            Keys.onPressed: event => {
-                                if (event.key === Qt.Key_Down) {
-                                    animeList.currentIndex = Math.min(animeList.count - 1, animeList.currentIndex + 1);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Up) {
-                                    animeList.currentIndex = Math.max(0, animeList.currentIndex - 1);
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    root.acceptAnimeChoice();
-                                    event.accepted = true;
-                                } else if (event.key === Qt.Key_Escape) {
-                                    root.finishAnimeMenu("");
-                                    event.accepted = true;
-                                }
-                            }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                Layout.fillWidth: true
-                                text: root.visibleAnimeChoices.length + " choices"
-                                color: Theme.muted
-                                font.family: Theme.font
-                                font.pixelSize: 10
-                            }
-                            TextButton { text: "Cancel"; onClicked: root.finishAnimeMenu("") }
-                            TextButton {
-                                text: "Select"
-                                primary: true
-                                enabled: root.visibleAnimeChoices.length > 0
-                                onClicked: root.acceptAnimeChoice()
-                            }
-                        }
-                    }
-                }
+                                    // AI chat and actions remain in the active sidebar.
+}
             }
         }
     }

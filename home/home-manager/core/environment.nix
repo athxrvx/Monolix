@@ -2,7 +2,7 @@
 {
   home.sessionVariables = {
     EDITOR = "nvim";
-    VISUAL = "gnome-text-editor";
+    VISUAL = "nvim";
     # The flake lives at ~/.config/nixconfig. Set it explicitly so the kuro
     # CLI and the launcher's update entries work from any directory.
     KURO_FLAKE = "${config.home.homeDirectory}/.config/nixconfig";

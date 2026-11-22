@@ -20,7 +20,7 @@ PopupWindow {
         network: "Network", volume: "Sound", mic: "Microphone",
         brightness: "Brightness", battery: "Battery",
         memory: "Memory", profile: "Power profile", bluetooth: "Bluetooth",
-        clipboard: "Clipboard", mouse: "Mouse", window: "Window", tray: "System tray"
+        clipboard: "Clipboard", mouse: "Mouse", window: "Window", tray: "System tray", ai: "Kuro AI"
     })[BarPopup.kind] ?? BarPopup.kind
 
     function place() {
@@ -47,9 +47,9 @@ PopupWindow {
             case "volume":
             case "mic":        Audio.refresh(); break;
             case "brightness": Brightness.refresh(); break;
-            case "battery":    Battery.refresh(); PowerProfile.refresh(); GpuStatus.refresh(); break;
+            case "battery":    Battery.refresh(); PowerProfile.refresh(); GpuStatus.refresh(true); Brightness.refresh(); break;
             case "memory":     SystemStats.refresh(); break;
-            case "profile":    PowerProfile.refresh(); GpuStatus.refresh(); break;
+            case "profile":    PowerProfile.refresh(); GpuStatus.refresh(true); break;
             case "bluetooth":  Bluetooth.refresh(); break;
             case "clipboard":  Clipboard.refresh(); break;
             case "mouse":      MouseBattery.refresh(); break;
@@ -57,12 +57,20 @@ PopupWindow {
     }
 
     anchor.window: barWindow
+    grabFocus: true
     visible: popup.requestedOpen || popupSurface.opacity > 0
     implicitWidth: Math.min(320, Math.max(1, barWindow.width - Theme.popupGap * 2))
     implicitHeight: Math.min(480, body.implicitHeight + 24)
     color: "transparent"
 
-    onVisibleChanged: if (visible && popup.requestedOpen) { place(); refresh(); }
+    onVisibleChanged: {
+        if (!visible && popup.requestedOpen) {
+            BarPopup.close();
+        } else if (visible && popup.requestedOpen) {
+            place();
+            refresh();
+        }
+    }
 
     Connections {
         target: BarPopup
@@ -72,12 +80,6 @@ PopupWindow {
         function onTargetChanged() {
             if (popup.requestedOpen) popup.place();
         }
-    }
-
-    HyprlandFocusGrab {
-        windows: [popup]
-        active: popup.requestedOpen && popup.visible && BarPopup.kind !== "tray"
-        onCleared: BarPopup.close()
     }
 
     Rectangle {
@@ -436,6 +438,8 @@ PopupWindow {
     Component {
         id: volumeC
         ColumnLayout {
+            id: volumePopup
+            property bool showStreams: false
             spacing: 10
 
             ValueSlider { trackRadius: 0; handleRadius: 0;
@@ -455,7 +459,6 @@ PopupWindow {
                     onClicked: Audio.toggleMute()
                 }
                 Item { Layout.fillWidth: true }
-                Text { text: Math.round(Audio.volume * 100) + "%"; color: Theme.text; font.family: Theme.font; font.pixelSize: Theme.fontSize }
             }
 
             Repeater {
@@ -466,6 +469,59 @@ PopupWindow {
                     sub: modelData.isDefault ? "Default output" : "Output"
                     active: modelData.isDefault
                     onClicked: Audio.setDefault(modelData, true)
+                }
+            }
+
+            TextButton {
+                Layout.fillWidth: true
+                radius: 0
+                text: volumePopup.showStreams ? "Hide per-app volume" : "Per-app volume"
+                onClicked: {
+                    volumePopup.showStreams = !volumePopup.showStreams;
+                    if (volumePopup.showStreams) Audio.refresh();
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: volumePopup.showStreams
+                spacing: 4
+
+                Text {
+                    visible: Audio.streams.length === 0
+                    text: "No apps are playing audio."
+                    color: Theme.muted
+                    font.family: Theme.font
+                    font.pixelSize: Theme.fontSize - 2
+                }
+
+                Repeater {
+                    model: Audio.streams
+                    ListRow {
+                        required property var modelData
+                        radius: 0
+                        icon: Icons.volume
+                        title: modelData.name
+                        sub: modelData.app
+                        interactive: false
+                        RowLayout {
+                            Layout.fillWidth: true
+                            ValueSlider {
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 100
+                                value: Math.round(modelData.volume * 100)
+                                label: ""
+                                suffix: "%"
+                                onMoved: v => Audio.setStreamVolume(modelData, v / 100)
+                            }
+                            TextButton {
+                                radius: 0
+                                text: modelData.muted ? "Unmute" : "Mute"
+                                onClicked: Audio.toggleStreamMute(modelData)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -513,6 +569,16 @@ PopupWindow {
         id: batteryC
         ColumnLayout {
             spacing: 8
+
+            ValueSlider { trackRadius: 0; handleRadius: 0;
+                from: 1
+                to: 100
+                value: Math.round(Brightness.value * 100)
+                label: "Brightness"
+                suffix: "%"
+                visible: Brightness.available
+                onMoved: v => Brightness.setValue(v / 100)
+            }
 
             ListRow { radius: 0;
                 icon: Icons.cpu

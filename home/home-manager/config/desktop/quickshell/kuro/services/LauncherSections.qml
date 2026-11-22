@@ -60,6 +60,18 @@ Singleton {
                 //     run: { type: "cmd", cmd: [Config.home + "/.config/hypr/scripts/toggle-filemanager.sh"] }
                 // },
                 {
+                    id: "appMusic", title: "Kuro Music",
+                    sub: "MPD library, queue, and playback",
+                    glyph: Icons.music, keys: "music player mpd library queue audio",
+                    hint: "open", run: { type: "cmd", cmd: ["qs", "-c", "shell", "ipc", "call", "music", "open"] }
+                },
+                {
+                    id: "appAi", title: "AI assistant",
+                    sub: "Open the local assistant and Ollama controls",
+                    glyph: Icons.cpu, keys: "ai assistant ollama chat local model sidebar",
+                    hint: "open", run: { type: "cmd", cmd: ["qs", "-c", "shell", "ipc", "call", "sidebar", "ai"] }
+                },
+               {
                     id: "appAll", title: "All applications",
                     sub: "Browse installed .desktop entries",
                     glyph: g(0xF003B), keys: "list browse programs",

@@ -13,11 +13,29 @@ Singleton {
     property string status: ""       // Charging | Discharging | Full | Not charging
     property string timeLeft: ""
     property real watts: 0
+    property int alertStage: 0         // 0 = none, 1 = low, 2 = critical
 
     readonly property bool charging: status === "Charging"
 
     function refresh() {
         if (!proc.running) proc.running = true;
+    }
+
+    function checkAlerts() {
+        if (status !== "Discharging") {
+            alertStage = 0;
+            return;
+        }
+
+        if (percent <= 10 && alertStage < 2) {
+            alertStage = 2;
+            Quickshell.execDetached(["notify-send", "-a", "Power", "-u", "critical", "-i", "battery-low",
+                                     "Battery critical", percent + "% remaining. Plug in immediately."]);
+        } else if (percent <= 25 && alertStage < 1) {
+            alertStage = 1;
+            Quickshell.execDetached(["notify-send", "-a", "Power", "-u", "normal", "-i", "battery-low",
+                                     "Battery low", percent + "% remaining. Plug in soon."]);
+        }
     }
 
     readonly property string script: [
@@ -41,6 +59,7 @@ Singleton {
                 root.status = l[1] ?? "";
                 root.watts = (parseInt(l[2]) || 0) / 1e6;
                 root.timeLeft = l[3] ?? "";
+                root.checkAlerts();
             }
         }
     }

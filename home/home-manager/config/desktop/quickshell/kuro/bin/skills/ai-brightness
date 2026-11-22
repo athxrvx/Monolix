@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Change screen brightness: 1-100 percent, or up/down by 10 percent.
+# Context for the assistant: use a percentage string for an absolute level, or
+# "up"/"down" for a small step. Nothing is passed through a shell.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Brightness failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-brightness <1-100|up|down>' 2
+command -v brightnessctl >/dev/null 2>&1 || die 'brightnessctl is unavailable' 127
+
+apply() {
+    local summary=$1 body=$2
+    shift 2
+    if brightnessctl set "$@"; then
+        notify_ok "$summary" "$body"
+    else
+        status=$?
+        notify_error "Brightness failed" "$body (status $status)."
+        exit "$status"
+    fi
+}
+
+case "$1" in
+    up)   apply "Brightness up" "Increased by 10%." +10% ;;
+    down) apply "Brightness down" "Decreased by 10%." 10%- ;;
+    *)
+        [[ $1 =~ ^[0-9]{1,3}$ ]] && (( $1 >= 1 && $1 <= 100 )) || {
+            die 'Brightness must be 1-100, up, or down' 2
+        }
+        apply "Brightness set" "$1%" "$1%"
+        ;;
+esac

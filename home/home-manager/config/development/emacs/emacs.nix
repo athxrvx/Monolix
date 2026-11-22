@@ -34,12 +34,12 @@ in
   # Individual files and directories are linked so that ~/.config/emacs itself
   # remains a writable directory for straight.el, eln-cache, and runtime state.
   xdg.configFile = {
-    "emacs/early-init.el".source = ./emacs/early-init.el;
-    "emacs/init.el".source = ./emacs/init.el;
-    "emacs/custom.el".source = ./emacs/custom.el;
-    "emacs/lisp".source = ./emacs/lisp;
-    "emacs/assets".source = ./emacs/assets;
-    "emacs/bin".source = ./emacs/bin;
+    "emacs/early-init.el".source = ./early-init.el;
+    "emacs/init.el".source = ./init.el;
+    "emacs/custom.el".source = ./custom.el;
+    "emacs/lisp".source = ./lisp;
+    "emacs/assets".source = ./assets;
+    "emacs/bin".source = ./bin;
     "emacs/tree-sitter".source = "${emacsTreesitGrammars}/lib";
   };
 

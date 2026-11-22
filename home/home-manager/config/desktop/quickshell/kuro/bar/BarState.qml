@@ -13,7 +13,7 @@ import qs.config
 //   island : true = center is replaced by the dynamic island (island/Island.qml), `center` ignored
 //   left / center / right : module lists, see bar/Module.qml
 //     workspaces[:kanji|:roman] clock date datetime network bluetooth
-//     volume mic brightness battery cpu memory tray notification profile clipboard overview weather mouse
+//     volume mic brightness battery cpu memory tray notification profile clipboard overview weather mouse ai
 Singleton {
     id: root
 
@@ -25,19 +25,19 @@ Singleton {
             style: "solid", height: 30, radius: 0, margin: { top: 0, left: 0, right: 0 },
             left:   ["workspaces"],
             center: ["clock"],
-            right:  ["tray", "network", "bluetooth", "volume", "mouse", "battery", "notification"]
+            right:  ["tray", "ai", "network", "bluetooth", "volume", "mouse", "battery", "notification"]
         },
         "float": {
             style: "solid", height: 32, radius: 0, margin: { top: 8, left: 12, right: 12 },
             left:   ["workspaces"],
             center: ["clock"],
-            right:  ["tray", "network", "bluetooth", "volume", "mic", "battery", "notification"]
+            right:  ["tray", "ai", "network", "bluetooth", "volume", "mic", "battery", "notification"]
         },
         "island": {
             style: "islands", height: 32, radius: 0, margin: { top: 6, left: 10, right: 10 }, island: true,
             left:   ["workspaces:kanji"],
             center: [],
-            right:  ["tray", "network", "bluetooth", "volume", "battery", "notification"]
+            right:  ["tray", "ai", "network", "bluetooth", "volume", "battery", "notification"]
         }
     })
 

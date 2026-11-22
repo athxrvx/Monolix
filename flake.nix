@@ -25,8 +25,8 @@
         modules = [
           ./config.nix
           home-manager.nixosModules.home-manager
-          # lanzaboote.nixosModules.lanzaboote
-          # ./modules/boot/secureboot.nix
+          lanzaboote.nixosModules.lanzaboote
+          ./modules/boot/secureboot.nix
           ./modules/desktop/hyprland.nix
           {
             home-manager.useGlobalPkgs = true;

@@ -7,7 +7,11 @@
       dns = "systemd-resolved";
     };
     hostName = "athena";
-    firewall.enable = true;
+    firewall = {
+      enable = true;
+      allowedTCPPorts = [ 53317 ];
+      allowedUDPPorts = [ 53317 ];
+    };
   };
 
   # tcp_bbr was loaded before but never selected.

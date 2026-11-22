@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Focus mode reuses the shell's existing DND and Caffeine IPC endpoints.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Focus mode failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-focus <on|off|toggle>' 2
+command -v qs >/dev/null 2>&1 || die 'qs (Quickshell) is not on PATH' 127
+command -v timeout >/dev/null 2>&1 || die 'timeout is unavailable' 127
+
+ipc() { timeout 5 qs -c shell ipc call "$@" >/dev/null; }
+
+dnd_state() {
+    local file="$HOME/.cache/quickshell/notif-dnd"
+    if [[ -r $file ]] && [[ $(tr -d '[:space:]' <"$file") == 1 ]]; then
+        echo on
+    else
+        echo off
+    fi
+}
+
+caffeine_state() {
+    local state
+    state=$(timeout 5 qs -c shell ipc call caffeine state 2>/dev/null | tr -d '[:space:]' || true)
+    [[ $state == on ]] && echo on || echo off
+}
+
+set_dnd()      { [[ $(dnd_state) == "$1" ]] || ipc notifications dnd; }
+set_caffeine() { [[ $(caffeine_state) == "$1" ]] || ipc caffeine toggle; }
+
+case "$1" in
+    on)   desired=on ;;
+    off)  desired=off ;;
+    toggle)
+        if [[ $(dnd_state) == on && $(caffeine_state) == on ]]; then
+            desired=off
+        else
+            desired=on
+        fi
+        ;;
+    *) die 'Invalid focus mode' 2 ;;
+esac
+
+if ! { set_dnd "$desired" && set_caffeine "$desired"; }; then
+    die 'Could not update Do Not Disturb or Caffeine.'
+fi
+
+actual_dnd=$(dnd_state)
+actual_caffeine=$(caffeine_state)
+if [[ $actual_dnd != "$desired" || $actual_caffeine != "$desired" ]]; then
+    die "Focus mode verification failed (DND=$actual_dnd, Caffeine=$actual_caffeine)."
+fi
+
+if [[ $desired == on ]]; then
+    notify critical "Focus mode on" "Notifications paused; idle sleep blocked."
+else
+    notify_ok "Focus mode off" "Notifications and idle sleep restored."
+fi
+printf 'Focus mode %s: DND %s, Caffeine %s.\n' "$desired" "$actual_dnd" "$actual_caffeine"

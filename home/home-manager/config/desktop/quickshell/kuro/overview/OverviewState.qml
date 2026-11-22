@@ -14,10 +14,30 @@ Singleton {
     property var clients: []        // [{ address, ws, x, y, w, h, cls, title, floating, monitor }]
     property var monitors: ({})     // name -> { x, y, w, h, activeWs }
     property bool loaded: false
+    property bool blurChangedForOverview: false
+    property bool restoreBlurAfterEnable: false
 
     function toggle() { shown ? close() : open(); }
-    function open()   { refresh(); shown = true; }
-    function close()  { shown = false; }
+    function open() {
+        if (shown) return;
+        restoreBlurAfterEnable = false;
+        refresh();
+        shown = true;
+        if (!blurReadProc.running && !blurEnableProc.running && !blurRestoreProc.running)
+            blurReadProc.running = true;
+    }
+
+    function close() {
+        shown = false;
+        if (blurEnableProc.running) restoreBlurAfterEnable = true;
+        else restoreBlur();
+    }
+
+    function restoreBlur() {
+        if (!blurChangedForOverview) return;
+        blurChangedForOverview = false;
+        blurRestoreProc.running = true;
+    }
 
     function refresh() {
         if (!proc.running) proc.running = true;
@@ -62,6 +82,41 @@ Singleton {
     }
 
     Timer { id: refreshLater; interval: 300; onTriggered: root.refresh() }
+
+    Process {
+        id: blurReadProc
+        command: ["hyprctl", "-j", "getoption", "decoration:blur:enabled"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let enabled = true;
+                try {
+                    const option = JSON.parse(text);
+                    enabled = option.bool !== undefined ? option.bool : option.int !== 0;
+                } catch (e) { return; }
+
+                if (!enabled && root.shown) {
+                    root.blurChangedForOverview = true;
+                    blurEnableProc.running = true;
+                }
+            }
+        }
+    }
+
+    Process {
+        id: blurEnableProc
+        command: ["hyprctl", "keyword", "decoration:blur:enabled", "true"]
+        onExited: if (root.restoreBlurAfterEnable || !root.shown) {
+            root.restoreBlurAfterEnable = false;
+            root.restoreBlur();
+        }
+    }
+
+    Process {
+        id: blurRestoreProc
+        command: ["hyprctl", "keyword", "decoration:blur:enabled", "false"]
+        onExited: if (root.shown && !blurReadProc.running && !blurEnableProc.running)
+            blurReadProc.running = true
+    }
 
     Process {
         id: proc

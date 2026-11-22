@@ -11,6 +11,8 @@ Rectangle {
     property string placeholder: ""
     property string icon: ""
     property bool password: false
+    property color borderColor: Theme.border
+    property color focusedBorderColor: Theme.subtext
     readonly property bool focused: input.activeFocus
 
     signal accepted()
@@ -21,7 +23,7 @@ Rectangle {
     implicitHeight: 32
     radius: Theme.radiusSmall
     color: Theme.surface
-    border.color: input.activeFocus ? Theme.subtext : Theme.border
+    border.color: input.activeFocus ? root.focusedBorderColor : root.borderColor
     Behavior on border.color { ColorAnimation { duration: 120 } }
 
     RowLayout {

@@ -72,6 +72,30 @@ Singleton {
         trail = drilled ? trail.concat([section]) : [];
         section = id;
         drilled = true;
+        refreshSectionData(id);
+    }
+
+    // Keep opening the root launcher lightweight. Refresh expensive/live
+    // sources only after the user enters the section that displays them.
+    function refreshSectionData(id) {
+        switch (id) {
+        case "setup": refreshStatus(); break;
+        case "containers": refreshContainers(); refreshContainerApps(); break;
+        case "control": refreshLive(); break;
+        case "dev-network": Network.refresh(); break;
+        case "dev-bluetooth": Bluetooth.refresh(); break;
+        case "dev-sound": Audio.refresh(); break;
+        case "dev-display":
+            Brightness.refresh(); NightLight.refresh(); Displays.refresh(); Hypr.refresh();
+            break;
+        case "style-appearance":
+            Brightness.refresh(); NightLight.refresh(); Displays.refresh(); Hypr.refresh(); Wallpaper.refresh();
+            break;
+        case "power":
+            Battery.refresh(); PowerProfile.refresh(); SystemInfo.refresh(); SystemStats.refresh();
+            break;
+        case "sys-clipboard": Clipboard.refresh(); break;
+        }
     }
     function goBack() {
         if (trail.length > 0) {
@@ -96,10 +120,6 @@ Singleton {
         drilled = false;
         trail = [];
         section = "apps";
-        refreshStatus();
-        refreshContainers();
-        refreshContainerApps();
-        refreshLive();
     }
 
     // Keep control values (volume, brightness, CPU…) fresh while the menu is
@@ -508,17 +528,6 @@ Singleton {
         return out;
     }
 
-    function barLayoutItems() {
-        return BarState.names.map(n => ({
-            title: n + " bar layout",
-            sub: "Apply the " + n + " layout",
-            glyph: Icons.g(0xF056E),
-            keys: "bar layout " + n,
-            hint: BarState.current === n ? "active" : "bar",
-            run: { type: "barSet", name: n }
-        }));
-    }
-
     // Live device/section rows (Network, Sound, Power…). Kept in a separate
     // singleton so this engine stays small.
     function liveItems(id) {
@@ -563,7 +572,6 @@ Singleton {
         let items = sec.items.slice();
         if (id === "apps") items = appItems().concat(items);
         if (id === "containers") items = containerItems(!flattenContainers).concat(items);
-        if (id === "appearance") items = items.concat(barLayoutItems());
         items = liveItems(id).concat(items);
 
         const out = [];

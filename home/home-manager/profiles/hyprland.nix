@@ -1,6 +1,10 @@
 # Import-only wiring. Each config tree declares its own installation in the
 # .nix file beside it; there is no central install module here.
 {
+  # Keep the PAM-unlocked daemon alive for the whole graphical session. Without
+  # this, a later Secret Service request can D-Bus-activate a fresh locked daemon.
+  services.gnome-keyring.enable = true;
+
   imports = [
     ../config/desktop/hyprland/hyprland.nix
     ../config/desktop/quickshell/kuro/quickshell.nix

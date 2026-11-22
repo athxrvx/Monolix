@@ -1,6 +1,6 @@
 complete -c kuro -f
-complete -c kuro -n '__fish_use_subcommand' -a 'sync switch s home build b test boot check status generations jump profile pr info doctor path pull update clean system gc edit search run try fhs menu completions help' -d 'Kuro command'
-complete -c kuro -n '__fish_seen_subcommand_from sync switch s home build b test boot check' -a 'athena' -d 'System profile'
+complete -c kuro -n '__fish_use_subcommand' -a 'sync switch s home build b test boot bt check status generations jump profile pr info doctor path pull update clean system gc edit search run try fhs menu completions help' -d 'Kuro command'
+complete -c kuro -n '__fish_seen_subcommand_from sync switch s home build b test boot bt check' -a 'athena' -d 'System profile'
 complete -c kuro -n '__fish_seen_subcommand_from generations' -a 'system home all' -d 'Generation type'
 complete -c kuro -n '__fish_seen_subcommand_from jump' -a '--pick' -d 'Choose generation with fzf'
 complete -c kuro -n '__fish_seen_subcommand_from completions' -a 'zsh fish' -d 'Shell'

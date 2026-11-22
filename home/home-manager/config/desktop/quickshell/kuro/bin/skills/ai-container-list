@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Read-only: list podman containers and distrobox containers.
+set -euo pipefail
+
+command -v podman >/dev/null 2>&1 || { echo "podman is unavailable" >&2; exit 127; }
+
+echo "Podman containers:"
+podman ps -a --format '  {{.Names}}  {{.Status}}  {{.Image}}' 2>/dev/null || true
+
+if command -v distrobox >/dev/null 2>&1; then
+    echo
+    echo "Distrobox containers:"
+    distrobox list 2>/dev/null || true
+fi

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+  <action>
+    <icon>utilities-terminal</icon>
+    <name>Open Kitty Here</name>
+    <unique-id>1763761200000000-1</unique-id>
+    <command>kitty --working-directory %f</command>
+    <description>Open Kitty in this directory</description>
+    <patterns>*</patterns>
+    <directories/>
+  </action>
+  <action>
+    <icon>preferences-desktop-wallpaper</icon>
+    <name>Set as Wallpaper</name>
+    <unique-id>1763761200000000-2</unique-id>
+    <command>awww img %f --transition-type grow</command>
+    <description>Set this image as the desktop wallpaper</description>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>edit-copy</icon>
+    <name>Copy Path</name>
+    <unique-id>1763761200000000-3</unique-id>
+    <command>echo -n %f | wl-copy</command>
+    <description>Copy the selected path to the clipboard</description>
+    <patterns>*</patterns>
+    <audio-files/>
+    <image-files/>
+    <other-files/>
+    <text-files/>
+    <video-files/>
+    <directories/>
+  </action>
+  <action>
+    <icon>text-editor</icon>
+    <name>Open in Neovim</name>
+    <unique-id>1763761200000000-4</unique-id>
+    <command>kitty -e nvim %f</command>
+    <description>Open this text or code file in Neovim</description>
+    <patterns>*</patterns>
+    <text-files/>
+  </action>
+</actions>

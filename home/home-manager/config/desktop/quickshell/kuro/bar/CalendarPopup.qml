@@ -1,12 +1,12 @@
 // Month calendar popup with current weather and a short forecast.
-// Weeks start on Monday. Scroll / ‹ › buttons change the month, click the title for today.
+// Weeks start on Monday. Scroll or use ‹ › to change months; Today returns to the current month.
 
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Hyprland
 import qs.config
 import qs.services
+import qs.components
 
 PopupWindow {
     id: popup
@@ -34,8 +34,10 @@ PopupWindow {
         const first = new Date(year, month, 1);
         const offset = (first.getDay() + 6) % 7;            // Monday = 0
         const start = new Date(year, month, 1 - offset);
+        const dayCount = new Date(year, month + 1, 0).getDate();
+        const cellCount = Math.ceil((offset + dayCount) / 7) * 7;
         const out = [];
-        for (let i = 0; i < 42; i++) {
+        for (let i = 0; i < cellCount; i++) {
             const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
             out.push({
                 day: d.getDate(),
@@ -78,10 +80,11 @@ PopupWindow {
     }
 
     anchor.window: barWindow
+    grabFocus: true
     readonly property bool showWeather: Config.weatherEnabled && Weather.available
     readonly property var shortDays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]   // getDay(): Sunday = 0
 
-    implicitWidth: Math.min(340, Math.max(1, barWindow.width - Theme.popupGap * 2))
+    implicitWidth: Math.min(600, Math.max(1, barWindow.width - Theme.popupGap * 2))
     implicitHeight: body.implicitHeight + 24
     color: "transparent"
 
@@ -92,18 +95,14 @@ PopupWindow {
         place();
         if (Config.weatherEnabled && !Weather.available) Weather.refresh();
     }
-
-    HyprlandFocusGrab {
-        windows: [popup]
-        active: popup.open && popup.visible
-        onCleared: popup.dismissed()
-    }
+    onVisibleChanged: if (!visible && popup.open) popup.dismissed()
 
     Rectangle {
         id: calendarSurface
         anchors.fill: parent
         radius: 0
         color: Theme.bg
+        border.width: 1
         border.color: Theme.border
         opacity: popup.open ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -121,77 +120,12 @@ PopupWindow {
         ColumnLayout {
             id: body
             anchors.fill: parent
-            anchors.margins: 14
+            anchors.margins: 16
             spacing: 12
 
-            // ── Current weather (click icon = refresh) ────────────────
             RowLayout {
                 Layout.fillWidth: true
-                visible: popup.showWeather
-                spacing: 12
-
-                Text {
-                    text: Weather.icon
-                    color: Theme.accent
-                    font.family: Theme.iconFont
-                    font.pixelSize: 42
-                    opacity: Weather.loading ? 0.5 : 1
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: Weather.refresh() }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                        spacing: 8
-                        Text {
-                            text: Math.round(Weather.temp) + "°"
-                            color: Theme.text
-                            font.family: Theme.font
-                            font.pixelSize: 30
-                            font.bold: true
-                        }
-                        ColumnLayout {
-                            spacing: 0
-                            Text {
-                                text: Weather.description
-                                color: Theme.text
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontSize - 1
-                            }
-                            Text {
-                                text: Weather.loading ? "updating…" : Weather.city
-                                color: Theme.muted
-                                font.family: Theme.font
-                                font.pixelSize: 12
-                                elide: Text.ElideRight
-                                Layout.maximumWidth: 150
-                            }
-                        }
-                    }
-
-                    Text {
-                        text: "feels " + Math.round(Weather.feels) + "°   ·   "
-                              + Weather.humidity + "%   ·   " + Math.round(Weather.wind) + " km/h"
-                        color: Theme.subtext
-                        font.family: Theme.font
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: Theme.border
-                visible: popup.showWeather
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 12
+                spacing: 16
 
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -313,12 +247,14 @@ PopupWindow {
                                     && modelData.date.toDateString() === popup.selectedDate.toDateString()
 
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 34
+                                Layout.preferredHeight: 32
                                 radius: 0
                                 color: selected || (modelData.today && !popup.showDay) ? Theme.accent
                                      : dayMouse.containsMouse ? Theme.surface2 : "transparent"
-                                border.width: modelData.today && popup.showDay && !selected ? 1 : 0
-                                border.color: Theme.accent
+                                border.width: (modelData.today && popup.showDay && !selected)
+                                             || dayMouse.containsMouse ? 1 : 0
+                                border.color: modelData.today && popup.showDay && !selected
+                                              ? Theme.accent : Theme.border
 
                                 Text {
                                     anchors.centerIn: parent
@@ -354,76 +290,193 @@ PopupWindow {
                     }
                 }
 
-            }
 
-            // ── 5-day forecast ────────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 1
-                color: Theme.border
-                visible: popup.showWeather
-            }
+                Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    color: Theme.border
+                    visible: true
+                }
 
-            RowLayout {
-                Layout.fillWidth: true
-                visible: popup.showWeather
-                spacing: 8
+                ColumnLayout {
+                    Layout.preferredWidth: 250
+                    Layout.maximumWidth: 250
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: 10
 
-                Repeater {
-                    model: Weather.daily
                     ColumnLayout {
-                        required property var modelData
-                        required property int index
+                        id: tasksPanel
                         Layout.fillWidth: true
-                        spacing: 4
+                        Layout.fillHeight: true
+                        spacing: 8
 
-                        Rectangle {
+                        RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 2
-                            radius: 0
-                            color: index === 0 ? Theme.accent : Theme.surface2
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Tasks"
+                                color: Theme.text
+                                font.family: Theme.font
+                                font.pixelSize: Theme.fontSize - 1
+                                font.bold: true
+                            }
+                            Text {
+                                text: Qt.formatDate(popup.selectedDate, "ddd, d MMM")
+                                color: Theme.muted
+                                font.family: Theme.font
+                                font.pixelSize: 10
+                            }
+                        }
+
+                        InputField {
+                            id: taskInput
+                            placeholder: "Add a task…"
+                            onAccepted: {
+                                if (text.trim() !== "") {
+                                    Todos.add(text, Todos.keyFor(popup.selectedDate));
+                                    text = "";
+                                }
+                            }
                         }
 
                         Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: index === 0 ? "Today" : popup.shortDays[modelData.date.getDay()]
-                            color: index === 0 ? Theme.text : Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 11
-                            font.bold: index === 0
-                        }
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: Weather.iconFor(modelData.code, true)
-                            color: Theme.accent
-                            font.family: Theme.iconFont
-                            font.pixelSize: 21
-                        }
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: Math.round(modelData.max) + "°"
-                            color: Theme.text
-                            font.family: Theme.font
-                            font.pixelSize: Theme.fontSize - 2
-                        }
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: Math.round(modelData.min) + "°"
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            visible: Todos.forDate(popup.selectedDate).length === 0
+                            text: "No tasks for this day"
                             color: Theme.muted
                             font.family: Theme.font
-                            font.pixelSize: 12
+                            font.pixelSize: 10
+                            verticalAlignment: Text.AlignVCenter
                         }
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            visible: modelData.rain >= 30     // show when rain chance is significant
-                            text: modelData.rain + "%"
-                            color: Theme.rose
-                            font.family: Theme.font
-                            font.pixelSize: 11
+
+                        ListView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            visible: Todos.forDate(popup.selectedDate).length > 0
+                            clip: true
+                            spacing: 3
+                            model: Todos.forDate(popup.selectedDate)
+
+                            delegate: RowLayout {
+                                required property var modelData
+                                width: ListView.view.width
+                                height: 25
+                                spacing: 7
+
+                                Rectangle {
+                                    Layout.preferredWidth: 14
+                                    Layout.preferredHeight: 14
+                                    color: modelData.done ? Theme.accent : "transparent"
+                                    border.width: 1
+                                    border.color: modelData.done ? Theme.accent : Theme.border
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.done ? "✓" : ""
+                                        color: Theme.accentFg
+                                        font.family: Theme.font
+                                        font.pixelSize: 10
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Todos.toggle(modelData.id)
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.title
+                                    color: modelData.done ? Theme.muted : Theme.text
+                                    font.family: Theme.font
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: "×"
+                                    color: removeMouse.containsMouse ? Theme.accent : Theme.muted
+                                    font.family: Theme.font
+                                    font.pixelSize: 14
+                                    MouseArea {
+                                        id: removeMouse
+                                        anchors.fill: parent
+                                        anchors.margins: -4
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Todos.remove(modelData.id)
+                                    }
+                                }
+                            }
                         }
                     }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: Theme.border
+                        visible: popup.showWeather
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 68
+                        Layout.minimumHeight: 65
+                        Layout.maximumHeight: 68
+                        visible: popup.showWeather
+                        spacing: 8
+
+                        Repeater {
+                            model: Weather.daily.slice(0, 5)
+                            ColumnLayout {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: 2
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 2
+                                    radius: 0
+                                    color: index === 0 ? Theme.accent : Theme.surface2
+                                }
+
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: index === 0 ? "Today" : popup.shortDays[modelData.date.getDay()]
+                                    color: index === 0 ? Theme.text : Theme.muted
+                                    font.family: Theme.font
+                                    font.pixelSize: 11
+                                    font.bold: index === 0
+                                }
+                                Item { Layout.fillHeight: true }
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: Weather.iconFor(modelData.code, true)
+                                    color: Theme.accent
+                                    font.family: Theme.iconFont
+                                    font.pixelSize: 18
+                                }
+                                Item { Layout.fillHeight: true }
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: Math.round(modelData.max) + "°"
+                                    color: Theme.text
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontSize - 2
+                                }
+                            }
+                        }
+                    }
+
+
                 }
             }
+
+
         }
     }
 }

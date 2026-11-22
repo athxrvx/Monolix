@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Transient user timers with validated durations and labels.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Timer failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# -ge 1 ]] || die 'Usage: ai-timer set SECONDS [LABEL] | ai-timer cancel ID | ai-timer list' 2
+for tool in systemctl systemd-run notify-send; do
+    command -v "$tool" >/dev/null 2>&1 || die "$tool is unavailable" 127
+done
+
+action=$1
+shift
+case "$action" in
+    set)
+        [[ $# -ge 1 && $# -le 2 ]] || die 'Usage: ai-timer set SECONDS [LABEL]' 2
+        seconds=$1
+        [[ $seconds =~ ^[0-9]+$ ]] && (( seconds >= 1 && seconds <= 86400 )) || {
+            die 'Duration must be 1-86400 seconds' 2
+        }
+        label=${2:-Timer}
+        case "$label" in
+            *[!A-Za-z0-9\ _-]*) die 'Label allows only letters, numbers, spaces, _ and -' 2 ;;
+        esac
+        (( ${#label} <= 48 )) || die 'Label is too long' 2
+        [[ -n $label ]] || label=Timer
+
+        id="t$(date +%s)-$RANDOM"
+        bus="unix:path=/run/user/$(id -u)/bus"
+        if systemd-run --user --unit="kuro-timer-$id" --collect \
+            --on-active="${seconds}s" \
+            --description="Kuro timer: $label" \
+            --setenv="DBUS_SESSION_BUS_ADDRESS=$bus" \
+            "$(command -v notify-send)" --app-name=Kuro --urgency=critical \
+            "Timer finished" "$label"; then
+            notify_ok "Timer set" "$label — ${seconds}s (id $id)"
+            printf 'Timer set: %s (%ss, id %s)\n' "$label" "$seconds" "$id"
+        else
+            status=$?
+            notify_error "Timer failed" "Could not create timer $id (status $status)."
+            exit "$status"
+        fi
+        ;;
+    cancel)
+        [[ $# == 1 ]] || die 'Usage: ai-timer cancel ID' 2
+        id=$1
+        [[ $id =~ ^t[0-9]+-[0-9]+$ ]] || die 'Invalid timer id' 2
+        if systemctl --user stop "kuro-timer-$id.timer"; then
+            notify_ok "Timer cancelled" "$id"
+            printf 'Timer cancelled: %s\n' "$id"
+        else
+            status=$?
+            notify_error "Timer failed" "Could not cancel timer $id (status $status)."
+            exit "$status"
+        fi
+        ;;
+    list)
+        [[ $# == 0 ]] || die 'Usage: ai-timer list' 2
+        systemctl --user list-units --plain --no-legend 'kuro-timer-*.timer' || true
+        ;;
+    *) die 'Invalid timer action' 2 ;;
+esac

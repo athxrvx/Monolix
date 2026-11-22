@@ -20,6 +20,7 @@ Singleton {
 
     property var sinks: []       // [{ id, name, isDefault }]
     property var sources: []
+    property var streams: []     // [{ id, name, app, volume, muted }]
 
     // Only one wpctl process per target; the last value is sent after the process finishes.
     property real pending: -1
@@ -27,6 +28,7 @@ Singleton {
 
     function refresh() {
         if (!statusProc.running && !setProc.running && !micProc.running) statusProc.running = true;
+        if (!streamProc.running) streamProc.running = true;
     }
 
     function setVolume(v) {
@@ -60,6 +62,17 @@ Singleton {
     function toggleMicMute() {
         micMuted = !micMuted;
         Quickshell.execDetached(["wpctl", "set-mute", source, "toggle"]);
+    }
+
+    function setStreamVolume(stream, v) {
+        v = Math.max(0, Math.min(1, v));
+        Quickshell.execDetached(["wpctl", "set-volume", String(stream.id), v.toFixed(2)]);
+        streams = streams.map(s => s.id === stream.id ? Object.assign({}, s, { volume: v }) : s);
+    }
+
+    function toggleStreamMute(stream) {
+        Quickshell.execDetached(["wpctl", "set-mute", String(stream.id), "toggle"]);
+        streams = streams.map(s => s.id === stream.id ? Object.assign({}, s, { muted: !s.muted }) : s);
     }
 
     function setDefault(dev, isSink) {
@@ -116,6 +129,49 @@ Singleton {
 
     Process { id: setProc; onExited: root.flush() }
     Process { id: micProc; onExited: root.flushMic() }
+
+    Process {
+        id: streamProc
+        command: ["wpctl", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = text.split("\n");
+                const section = lines.findIndex(line => /Streams:\s*$/.test(line));
+                if (section < 0) {
+                    root.streams = [];
+                    return;
+                }
+
+                const entries = [];
+                for (let i = section + 1; i < lines.length; i++) {
+                    const raw = lines[i];
+                    if (raw.trim() === "") continue;
+                    if (!/^[\s│├└─]/.test(raw)) break;
+                    const clean = raw.replace(/[│├└─]/g, " ");
+                    const match = clean.match(/^(\s*)(\d+)\.\s+(.+?)\s*$/);
+                    if (!match) continue;
+                    entries.push({ indent: match[1].length, id: parseInt(match[2]), text: match[3] });
+                }
+
+                if (entries.length === 0) {
+                    root.streams = [];
+                    return;
+                }
+
+                const level = Math.min(...entries.map(entry => entry.indent));
+                root.streams = entries.filter(entry => entry.indent === level).map(entry => {
+                    const volumeMatch = entry.text.match(/\[vol:\s*([\d.]+)\]/i);
+                    return {
+                        id: entry.id,
+                        name: entry.text.replace(/\s*\[vol:[^\]]*\]/i, "").replace(/\s*\[MUTED\]/i, "").trim(),
+                        app: "",
+                        volume: volumeMatch ? Math.max(0, Math.min(1, parseFloat(volumeMatch[1]))) : 1,
+                        muted: /\[MUTED\]/i.test(entry.text)
+                    };
+                });
+            }
+        }
+    }
 
     Component.onCompleted: refresh()
 }

@@ -7,6 +7,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import qs.bar
 import qs.notifications
 import qs.overview
@@ -19,26 +20,75 @@ import qs.lock
 import qs.capture
 import qs.monitor
 import qs.sidebar
+import qs.music
 
 ShellRoot {
     // Instantiate the kuro.toml watcher/generator for the whole session.
     property bool kuroReady: Kuro.ready
 
+    // Battery automation must run even while the Power page is closed.
+    property bool powerAutomationReady: PowerAutomation.loaded
+
     Popups {}
     NotifCenter {}
     StylePicker { id: stylePicker }
     SystemMonitor { id: systemMonitor }
-    SidebarWindow { id: sidebarWindow }
+    SidebarWindow { id: aiSidebar }
+    MusicPlayerWindow { id: musicPlayer }
+
+    Connections {
+        target: AiAppletState
+        function onOpenRequested(item, window) { BarPopup.show("ai", item, window) }
+        function onToggleRequested(item, window) { BarPopup.toggle("ai", item, window) }
+    }
+
+    Connections {
+        target: BarPopup
+        function onOpenChanged() { aiSidebar.syncFromBar() }
+        function onKindChanged() { aiSidebar.syncFromBar() }
+        function onTargetChanged() { aiSidebar.syncFromBar() }
+        function onBarWindowChanged() { aiSidebar.syncFromBar() }
+    }
 
     IpcHandler {
         target: "sidebar"
-        function toggle(): void { sidebarWindow.toggle() }
-        function open(): void { sidebarWindow.open() }
-        function close(): void { sidebarWindow.close() }
-        function tab(index: int): void { sidebarWindow.selectTab(index === 1 ? 1 : 0) }
-        function animeMenu(prompt: string, inputPath: string, outputPath: string): string {
-            return sidebarWindow.requestAnimeMenu(prompt, inputPath, outputPath);
-        }
+        function toggle(): void { AiAppletState.toggle() }
+        function open(): void { AiAppletState.open() }
+        function close(): void { BarPopup.close() }
+        function ai(): void { AiAppletState.open() }
+    }
+
+    IpcHandler {
+        target: "idle"
+        function screenOff(): void { Hyprland.dispatch("dpms off") }
+        function screenOn(): void { Hyprland.dispatch("dpms on") }
+    }
+
+    Connections {
+        target: Music
+        function onToggleRequested() { musicPlayer.toggle() }
+        function onOpenRequested() { musicPlayer.openWindow() }
+    }
+
+    IpcHandler {
+        target: "music"
+        function toggle(): void { musicPlayer.toggle() }
+        function open(): void { musicPlayer.openWindow() }
+        function close(): void { musicPlayer.visible = false }
+        function refresh(): void { Music.refresh() }
+    }
+
+    IpcHandler {
+        target: "caffeine"
+        function toggle(): void { Caffeine.toggle() }
+        function state(): string { return Caffeine.active ? "on" : "off" }
+    }
+
+    IpcHandler {
+        target: "layout"
+        function cycle(): void { LayoutMode.cycle() }
+        function refresh(): void { LayoutMode.refresh() }
+        function state(): string { return LayoutMode.current }
     }
 
     IpcHandler {
@@ -81,7 +131,7 @@ ShellRoot {
     }
 
     Loader {
-        active: BarPopup.open || BarPopup.closing
+        active: (BarPopup.open || BarPopup.closing) && BarPopup.kind !== "ai"
         sourceComponent: ModulePopup {
             barWindow: BarPopup.barWindow
             target: BarPopup.target

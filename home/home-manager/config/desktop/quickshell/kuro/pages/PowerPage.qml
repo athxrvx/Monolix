@@ -66,6 +66,21 @@ Page {
         }
     }
 
+    SettingRow {
+        visible: Battery.available
+        Layout.topMargin: 6
+        title: "Automatic battery saver"
+        sub: PowerAutomation.active
+            ? "Active below 30% · power saver · dims to 50% (manual changes are kept)"
+            : PowerAutomation.enabled
+                ? "At 30% while unplugged · restores on charge or at 35%"
+                : "Off · manage the power profile and brightness yourself"
+        Switch {
+            checked: PowerAutomation.enabled
+            onToggled: PowerAutomation.setEnabled(!PowerAutomation.enabled)
+        }
+    }
+
     InfoRow {
         visible: MouseBattery.available
         key: "mouse"

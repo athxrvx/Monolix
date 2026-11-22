@@ -5,6 +5,7 @@ import Quickshell
 import qs.config
 import qs.bar
 import qs.dock
+import qs.services
 
 // Live rows for the launcher's control sections. The old Control Center pages
 // became these item builders: each row can carry a value, a toggle/slider
@@ -455,6 +456,11 @@ Singleton {
 
     function panelSettingItems() {
         const out = [{
+            title: "Cycle bar layout", sub: "Switch to the next configured panel layout",
+            glyph: Icons.overview, keys: "bar panel layout next cycle",
+            hint: BarState.current, keepOpen: true,
+            run: { type: "barNext" }
+        }, {
             title: "Show bar", sub: "Show or hide the top panel",
             glyph: Icons.overview, keys: "bar panel status show hide",
             hint: BarState.shown ? "active" : "show", value: BarState.shown ? "active" : "",
@@ -581,7 +587,29 @@ Singleton {
 
     // ── Power & session ──────────────────────────────────────────────
     function powerItems() {
-        return [{
+        return [toggle({
+            title: "Caffeine",
+            sub: Caffeine.active
+                ? "On · idle sleep is inhibited"
+                : "Off · normal idle and sleep rules apply",
+            glyph: g(0xF009E),
+            keys: "caffeine keep awake prevent idle sleep suspend inhibit",
+            value: onoff(Caffeine.active),
+            active: Caffeine.active,
+            run: { type: "callback", fn: () => Caffeine.toggle() }
+        }), toggle({
+            title: "Auto battery saver",
+            sub: PowerAutomation.active
+                ? "Active · power saver at 30% · brightness stays adjustable"
+                : PowerAutomation.enabled
+                    ? "Turns on at 30% while unplugged"
+                    : "Off · manage profile and brightness manually",
+            glyph: Icons.battery,
+            keys: "automatic auto battery saver low battery power profile brightness 30 percent",
+            value: onoff(PowerAutomation.enabled),
+            active: PowerAutomation.enabled,
+            run: { type: "callback", fn: () => PowerAutomation.setEnabled(!PowerAutomation.enabled) }
+        }), {
             title: "Lock", sub: "Start the lock screen",
             glyph: Icons.lock, keys: "lock screen session",
             hint: "session", check: "command -v qs >/dev/null",

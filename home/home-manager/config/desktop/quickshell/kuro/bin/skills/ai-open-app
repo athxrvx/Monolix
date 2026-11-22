@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Launch an installed desktop application by its .desktop id.
+# Context for the assistant: use ids such as firefox, kitty, dolphin, discord,
+# spotify. The id is validated and resolved only inside the standard
+# applications directories; no arbitrary command is executed.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Application failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-open-app <desktop-id>' 2
+app=$1
+[[ $app =~ ^[A-Za-z0-9._-]{1,80}$ ]] || die 'Invalid application id' 2
+[[ $app == *.desktop ]] || app="$app.desktop"
+
+command -v dex >/dev/null 2>&1 || die 'dex is unavailable' 127
+
+data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
+IFS=: read -r -a dirs <<< "$data_dirs:$HOME/.local/share"
+file=""
+for dir in "${dirs[@]}"; do
+    [[ -n $dir ]] || continue
+    if [[ -f $dir/applications/$app ]]; then
+        file="$dir/applications/$app"
+        break
+    fi
+done
+[[ -n $file ]] || die "Unknown application: $app"
+
+if dex "$file"; then
+    notify_ok "Application opened" "$app"
+    printf 'Opened application: %s\n' "$app"
+else
+    status=$?
+    notify_error "Application failed" "$app (status $status)."
+    exit "$status"
+fi

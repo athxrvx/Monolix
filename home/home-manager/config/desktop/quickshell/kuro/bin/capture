@@ -64,7 +64,12 @@ case "${1:-}" in
                 ;;
             *) exit 2 ;;
         esac
-        notify "Screenshot saved" "$file"
+        if wl-copy --type image/png < "$file"; then
+            notify "Screenshot saved and copied" "$file"
+        else
+            notify "Screenshot saved" "$file"
+            notify "Clipboard copy failed" "Screenshot was saved at $file."
+        fi
         ;;
     record)
         area="${2:-full}"
@@ -104,7 +109,13 @@ case "${1:-}" in
         notify "Screen recording started" "$file"
         wait "$recorder_pid" || true
         rm -f "$state_file"
-        notify "Screen recording saved" "$file"
+        recording_uri="$(python3 -c 'from pathlib import Path; from urllib.parse import quote; import sys; print("file://" + quote(str(Path(sys.argv[1]).resolve()), safe="/"))' "$file")"
+        if printf '%s\r\n' "$recording_uri" | wl-copy --type text/uri-list; then
+            notify "Screen recording saved and copied" "$file"
+        else
+            notify "Screen recording saved" "$file"
+            notify "Clipboard copy failed" "Recording was saved at $file."
+        fi
         ;;
     stop)
         if [[ -s "$state_file" ]]; then

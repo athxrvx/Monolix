@@ -20,9 +20,17 @@ PanelWindow {
     readonly property int maxHeight: Math.round((screen?.height ?? 900) * 0.75) - barOffset
 
     property int tick: 0          // refreshes relative time labels ("5m", "1h") while open
+    property real panelProgress: Notifications.centerOpen ? 1 : 0
+    Behavior on panelProgress {
+        NumberAnimation {
+            duration: 150
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: [0.34, 0.80, 0.34, 1.00, 1, 1]
+        }
+    }
 
     screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
-    visible: Notifications.centerOpen || panel.opacity > 0
+    visible: Notifications.centerOpen || panelProgress > 0.001
 
     anchors { top: true; right: true }
     margins {
@@ -31,7 +39,8 @@ PanelWindow {
     }
 
     implicitWidth: Math.min(Config.notifWidth + 48, (screen?.width ?? 1280) - Theme.popupGap * 2)
-    implicitHeight: Math.min(root.maxHeight, header.implicitHeight + content.implicitHeight + 36)
+    readonly property int notificationsHeight: Math.max(flick.contentHeight, Notifications.groups.length === 0 ? 112 : 0)
+    implicitHeight: Math.min(root.maxHeight, header.implicitHeight + notificationsHeight + 51)
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
@@ -61,11 +70,9 @@ PanelWindow {
         border.width: 1
         border.color: Theme.border
 
-        opacity: Notifications.centerOpen ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        opacity: root.panelProgress
         transform: Translate {
-            y: Notifications.centerOpen ? 0 : -10
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            y: -8 * (1 - root.panelProgress)
         }
 
         Item {
@@ -141,7 +148,7 @@ PanelWindow {
         }
 
         // ── List ──────────────────────────────────────────────────────
-        Flickable {
+        ListView {
             id: flick
             anchors.left: parent.left
             anchors.right: parent.right
@@ -150,81 +157,43 @@ PanelWindow {
             anchors.leftMargin: 18
             anchors.rightMargin: 18
             anchors.bottomMargin: 18
-            anchors.topMargin: 0
-            contentHeight: content.implicitHeight
+            anchors.topMargin: 12
+            spacing: 12
             boundsBehavior: Flickable.StopAtBounds
+            flickDeceleration: 3000
+            maximumFlickVelocity: 3200
             clip: true
 
-            ColumnLayout {
-                id: content
+            model: Notifications.groups
+            delegate: NotifGroup {
+                required property var modelData
                 width: flick.width
-                spacing: 12
+                group: modelData
+                refreshTick: root.tick
+            }
 
-                Text {
-                    visible: Notifications.count === 0
-                    Layout.fillWidth: true
-                    Layout.topMargin: 44
-                    Layout.bottomMargin: 44
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "You’re all caught up"
-                    color: Theme.text
-                    font.family: Theme.font
-                    font.pixelSize: Theme.fontSize
-                    font.bold: true
-                }
-
-                Repeater {
-                    model: Notifications.groups
-
-                    ColumnLayout {
-                        id: group
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.topMargin: 8
-                            Layout.leftMargin: 2
-                            Layout.rightMargin: 2
-                            Layout.bottomMargin: 2
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: group.modelData.app
-                                color: Theme.text
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontSize - 1
-                                font.bold: true
-                            }
-                            Text {
-                                text: String(group.modelData.items.length)
-                                color: Theme.muted
-                                font.family: Theme.font
-                                font.pixelSize: 11
-                                Layout.rightMargin: 4
-                            }
-                            TextButton {
-                                text: "Clear"
-                                sharp: true
-                                onClicked: group.modelData.items.slice().forEach(n => Notifications.dismiss(n))
-                            }
-                        }
-
-                        Repeater {
-                            model: group.modelData.items
-
-                            NotifCard {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                compact: true
-                                notif: modelData
-                                refreshTick: root.tick
-                            }
-                        }
-                    }
+            add: Transition {
+                NumberAnimation {
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: 150
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: [0.34, 0.80, 0.34, 1.00, 1, 1]
                 }
             }
+        }
+
+        Text {
+            anchors.centerIn: flick
+            width: flick.width
+            visible: Notifications.groups.length === 0
+            horizontalAlignment: Text.AlignHCenter
+            text: "You’re all caught up"
+            color: Theme.text
+            font.family: Theme.font
+            font.pixelSize: Theme.fontSize
+            font.bold: true
         }
 
         // Indikator scroll

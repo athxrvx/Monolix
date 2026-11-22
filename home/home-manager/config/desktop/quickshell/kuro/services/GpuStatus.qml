@@ -13,6 +13,7 @@ Singleton {
     property string name: ""
     property int utilization: 0
     property string runtimeStatus: "unknown"
+    property bool pendingNvidiaQuery: false
     readonly property bool running: (available && (utilization > 0 || runtimeStatus === "active")) || Capture.recording
     readonly property string summary: Capture.recording
         ? "GPU active · screen recording"
@@ -21,8 +22,13 @@ Singleton {
           + (runtimeStatus !== "unknown" ? " · runtime " + runtimeStatus : "")
           + " · " + utilization + "%"
 
-    function refresh() {
-        if (!proc.running) proc.running = true;
+    function refresh(queryNvidia) {
+        if (proc.running) {
+            if (queryNvidia === true) pendingNvidiaQuery = true;
+            return;
+        }
+        proc.command = ["sh", "-c", root.script, "sh", queryNvidia === true ? "1" : "0"];
+        proc.running = true;
     }
 
     readonly property string script: [
@@ -36,7 +42,7 @@ Singleton {
         '  case "$state" in active) runtime=active;; suspended) [ "$runtime" = active ] || runtime=suspended;; esac',
         '  [ -n "$gpu_name" ] || gpu_name=${driver:-GPU}',
         'done',
-        'if command -v nvidia-smi >/dev/null 2>&1; then',
+        'if [ "${1:-0}" = 1 ] && command -v nvidia-smi >/dev/null 2>&1; then',
         '  n=$(nvidia-smi --query-gpu=name,utilization.gpu --format=csv,noheader,nounits 2>/dev/null | awk -F, \'NF >= 2 {name=$1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", name); value=$2+0; if (best == "" || value > max) {max=value; best=name}} END {if (NR) printf "%s|%d\\n", best, max}\')',
         '  if [ -n "$n" ]; then printf "%s|%s\\n" "$n" "$runtime"; exit 0; fi',
         'fi',
@@ -59,12 +65,11 @@ Singleton {
         repeat: true
         running: true
         triggeredOnStart: true
-        onTriggered: root.refresh()
+        onTriggered: root.refresh(false)
     }
 
     Process {
         id: proc
-        command: ["sh", "-c", root.script]
         stdout: StdioCollector {
             onStreamFinished: {
                 const fields = text.trim().split("|");
@@ -75,7 +80,12 @@ Singleton {
                 root.runtimeStatus = root.available ? fields[2] : "unknown";
             }
         }
+        onExited: {
+            if (!root.pendingNvidiaQuery) return;
+            root.pendingNvidiaQuery = false;
+            Qt.callLater(() => root.refresh(true));
+        }
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: refresh(false)
 }

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Read-only: CPU load, memory usage, the warmest sensor, and GPU summary.
+set -euo pipefail
+
+read -r load1 load5 load15 _ < /proc/loadavg
+cores=$(nproc 2>/dev/null || echo "?")
+mem=$(awk '/^MemTotal:/ {t=$2} /^MemAvailable:/ {a=$2} END {
+    if (t > 0) printf "%.1f GiB used of %.1f GiB (%.0f%%)", (t-a)/1048576, t/1048576, (t-a)*100/t
+}' /proc/meminfo)
+
+printf 'CPU load: %s %s %s (%s cores)\n' "$load1" "$load5" "$load15" "$cores"
+printf 'Memory: %s\n' "${mem:-unknown}"
+
+max_temp=$(
+    for f in /sys/class/hwmon/hwmon*/temp*_input; do
+        [[ -r $f ]] || continue
+        value=$(<"$f")
+        [[ $value =~ ^[0-9]+$ ]] || continue
+        celsius=$((value / 1000))
+        (( celsius >= 1 && celsius <= 150 )) && printf '%s\n' "$celsius"
+    done | sort -n | awk 'END { print }'
+)
+if [[ -n $max_temp ]]; then
+    printf 'Highest sensor: %s °C\n' "$max_temp"
+fi
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu=$(nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total \
+        --format=csv,noheader 2>/dev/null | awk 'NR == 1' || true)
+    if [[ -n $gpu ]]; then
+        printf 'GPU: %s\n' "$gpu"
+    fi
+fi

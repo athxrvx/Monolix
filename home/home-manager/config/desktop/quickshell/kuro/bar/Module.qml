@@ -30,7 +30,7 @@ Item {
         volume: volumeC, mic: micC, brightness: brightnessC, battery: batteryC,
         cpu: cpuC, memory: memoryC, profile: profileC,
         notification: notificationC, tray: trayC, clipboard: clipboardC, overview: overviewC,
-        mouse: mouseC
+        mouse: mouseC, ai: aiC
     })
 
     // Hide modules whose data is unavailable (for example battery on a desktop)
@@ -277,6 +277,20 @@ Item {
             id: clipboardItem
             icon: Icons.clipboard
             onClicked: BarPopup.toggle("clipboard", clipboardItem, root.window)
+        }
+    }
+
+    Component {
+        id: aiC
+        BarItem {
+            id: aiItem
+            icon: Icons.bot
+            onClicked: {
+                AiAppletState.register(aiItem, root.window);
+                BarPopup.toggle("ai", aiItem, root.window);
+            }
+            Component.onCompleted: AiAppletState.register(aiItem, root.window)
+            Component.onDestruction: AiAppletState.unregister(aiItem)
         }
     }
 

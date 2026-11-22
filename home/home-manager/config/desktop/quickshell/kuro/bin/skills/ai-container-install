@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Install an allowlisted set of packages inside a validated container.
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/notify.sh"
+
+die() {
+    notify_error "Package install failed" "$1"
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# -ge 3 ]] || die 'Usage: ai-container-install <container> <apt|dnf|pacman|apk> <package>...' 2
+container=$1
+manager=$2
+shift 2
+
+[[ $container =~ ^[a-z][a-z0-9_.-]{0,62}$ ]] || die 'Invalid container name' 2
+case "$manager" in
+    apt|dnf|pacman|apk) ;;
+    *) die 'Unsupported package manager' 2 ;;
+esac
+(( $# >= 1 && $# <= 8 )) || die 'Provide 1 to 8 packages' 2
+
+packages=()
+for pkg in "$@"; do
+    [[ $pkg =~ ^[a-z0-9][a-z0-9+._-]{0,63}$ ]] || die "Invalid package name: $pkg" 2
+    packages+=("$pkg")
+done
+
+for tool in podman distrobox; do
+    command -v "$tool" >/dev/null 2>&1 || die "$tool is unavailable" 127
+done
+podman container exists "$container" || die "Unknown container: $container"
+
+notify normal "Installing packages" "$container: ${packages[*]}"
+status=0
+case "$manager" in
+    apt)
+        distrobox enter "$container" -- sudo apt-get update || status=$?
+        if (( status == 0 )); then
+            distrobox enter "$container" -- sudo apt-get install -y --no-install-recommends \
+                "${packages[@]}" || status=$?
+        fi
+        ;;
+    dnf)
+        distrobox enter "$container" -- sudo dnf install -y "${packages[@]}" || status=$?
+        ;;
+    pacman)
+        distrobox enter "$container" -- sudo pacman -S --noconfirm "${packages[@]}" || status=$?
+        ;;
+    apk)
+        distrobox enter "$container" -- sudo apk add "${packages[@]}" || status=$?
+        ;;
+esac
+
+if (( status == 0 )); then
+    notify_ok "Packages installed" "$container: ${packages[*]}"
+else
+    notify_error "Package install failed" "$container: ${packages[*]} (status $status)."
+    if [[ -t 0 ]]; then
+        read -r -p 'Press Enter to close this terminal... ' _ || true
+    fi
+fi
+exit "$status"

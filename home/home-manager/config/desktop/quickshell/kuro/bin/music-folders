@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+music_root="${HOME}/Music"
+import_root="${music_root}/Imported Folders"
+action="${1:-list}"
+
+case "$action" in
+  list)
+    if [[ -d "$import_root" ]]; then
+      find "$import_root" -mindepth 1 -maxdepth 1 -type l -printf '%f\t%l\n' | sort
+    fi
+    ;;
+  add)
+    [[ $# -eq 2 ]] || { echo "Choose a folder to add." >&2; exit 2; }
+    source_dir="$(realpath -e -- "$2")" || { echo "Folder does not exist." >&2; exit 2; }
+    [[ -d "$source_dir" ]] || { echo "Selected path is not a folder." >&2; exit 2; }
+    mkdir -p -- "$import_root"
+    import_real="$(realpath -e -- "$import_root")"
+    music_real="$(realpath -e -- "$music_root")"
+    [[ "$source_dir" != "/" ]] || { echo "Cannot import the filesystem root." >&2; exit 2; }
+    [[ "$music_real" != "$source_dir" && "$music_real" != "$source_dir/"* ]] || { echo "Cannot import a parent of ~/Music." >&2; exit 2; }
+    case "$source_dir/" in
+      "$music_real/"*) echo "That folder is already inside ~/Music." >&2; exit 2 ;;
+      "$import_real/"*) echo "That folder is already inside the import area." >&2; exit 2 ;;
+    esac
+
+    name="$(basename -- "$source_dir")"
+    target="$import_root/$name"
+    suffix=2
+    while [[ -e "$target" || -L "$target" ]]; do
+      target="$import_root/$name ($suffix)"
+      ((suffix += 1))
+    done
+    ln -s -- "$source_dir" "$target"
+    printf 'Added %s to the MPD library.\n' "$(basename -- "$target")"
+    ;;
+  remove)
+    [[ $# -eq 2 ]] || { echo "Choose an imported folder to remove." >&2; exit 2; }
+    name="$2"
+    [[ "$name" != */* && "$name" != "." && "$name" != ".." ]] || { echo "Invalid imported folder name." >&2; exit 2; }
+    target="$import_root/$name"
+    [[ -L "$target" ]] || { echo "Imported folder not found." >&2; exit 2; }
+    rm -- "$target"
+    printf 'Removed %s from the MPD library. The original folder was left untouched.\n' "$name"
+    ;;
+  *)
+    echo "Usage: music-folders {list|add PATH|remove NAME}" >&2
+    exit 2
+    ;;
+esac

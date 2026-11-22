@@ -13,6 +13,5 @@ return function()
     hl.animation({ leaf = "layersOut",        enabled = true, speed = 3, bezier = "easeOutQuint" })
     hl.animation({ leaf = "workspaces",       enabled = true, speed = 4, bezier = "easeOutQuint", style = "slide" })
     hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4, bezier = "easeOutQuint", style = "slide" })
-
     hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 end

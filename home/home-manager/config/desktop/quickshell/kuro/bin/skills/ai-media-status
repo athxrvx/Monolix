@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Read-only: report the active MPRIS player, track, and playback state.
+# Output is returned to the assistant; this script never changes playback.
+set -euo pipefail
+
+command -v playerctl >/dev/null 2>&1 || { echo "playerctl is unavailable" >&2; exit 127; }
+
+players=$(playerctl -l 2>/dev/null || true)
+if [[ -z $players ]]; then
+    echo "No media player is running."
+    exit 0
+fi
+
+player=$(printf '%s\n' "$players" | awk 'NR == 1')
+status=$(playerctl status 2>/dev/null || true)
+track=$(playerctl metadata --format '{{artist}} — {{title}}' 2>/dev/null || true)
+[[ -n $track ]] || track=$(playerctl metadata --format '{{title}}' 2>/dev/null || true)
+[[ -n $track ]] || track="Unknown track"
+
+printf 'Player: %s\nStatus: %s\nTrack: %s\n' "$player" "${status:-Unknown}" "$track"

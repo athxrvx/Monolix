@@ -23,7 +23,7 @@ refreshes the inputs later.
 
 ## What's inside
 
-- **Hyprland session** — greetd/tuigreet login, Hyprland keybinds and autostart,
+- **Hyprland session** — SDDM autologin, Hyprland keybinds and autostart,
   and the QuickShell Kuro shell installed at `~/.config/quickshell/shell` and
   launched from Hyprland's autostart.
 - **Kuro theming** — theme definitions are Nix-managed TOML files in

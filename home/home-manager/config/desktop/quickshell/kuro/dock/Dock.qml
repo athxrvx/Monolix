@@ -6,7 +6,6 @@
 //   right click   app context menu: open, app actions, windows, pin/unpin
 //   hover         window previews for every window of the grouped app
 //
-// Left side: workspace overview (the Alt+Tab switcher).
 // Toggle the dock from Style -> Appearance -> Show dock or:
 //   qs -c shell ipc call dock toggle
 
@@ -17,7 +16,6 @@ import Quickshell.Widgets
 import Quickshell.Hyprland
 import qs.config
 import qs.dock
-import qs.overview
 import qs.services
 
 Scope {
@@ -345,54 +343,6 @@ Scope {
                     x: Math.max(0, (flick.width - width) / 2)
                     y: (flick.height - height) / 2
                     spacing: 4
-
-                    // Workspace overview / window switcher (Alt+Tab)
-                    Rectangle {
-                        readonly property bool active: OverviewState.shown
-                        width: 44
-                        height: 40
-                        radius: Theme.radiusSmall
-                        color: active
-                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.20)
-                            : overviewMouse.containsMouse
-                                ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.07)
-                                : "transparent"
-                        border.width: active ? 1 : 0
-                        border.color: Theme.accent
-                        Behavior on color { ColorAnimation { duration: 100 } }
-
-                        IconImage {
-                            anchors.centerIn: parent
-                            implicitSize: 24
-                            source: "file:///usr/share/icons/Papirus/48x48/apps/preferences-system-windows.svg"
-                        }
-
-                        Rectangle {
-                            visible: parent.active
-                            anchors.bottom: parent.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: 12
-                            height: 2
-                            color: Theme.accent
-                        }
-
-                        MouseArea {
-                            id: overviewMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            Accessible.name: "Workspace overview"
-                            onClicked: { root.closePreview(); OverviewState.toggle(); }
-                        }
-                    }
-
-                    // Separator before pinned apps and open windows.
-                    Rectangle {
-                        width: 1
-                        height: 24
-                        y: 8
-                        color: Theme.border
-                    }
 
                     Repeater {
                         model: win.items

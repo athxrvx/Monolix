@@ -14,6 +14,7 @@ Singleton {
     property bool available: false
     property real value: 0       // 0..1
     property real pending: -1
+    property int userRevision: 0
 
     // Lower bound so the screen isn't completely dark
     readonly property int minPercent: 1
@@ -23,6 +24,17 @@ Singleton {
     }
 
     function setValue(v) {
+        userRevision++;
+        applyValue(v);
+    }
+
+    // Automatic shell policies can change brightness without counting as a
+    // user override, so the previous level can be restored when they end.
+    function setValueAutomatic(v) {
+        applyValue(v);
+    }
+
+    function applyValue(v) {
         if (!available) return;
         v = Math.max(0, Math.min(1, v));
         value = v;

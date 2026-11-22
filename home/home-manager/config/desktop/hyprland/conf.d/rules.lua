@@ -14,6 +14,18 @@ return function()
     })
 
     hl.window_rule({
+        name = "pip-sticky",
+        match = {
+            title = "^([Pp]icture[-\\s]?[Ii]n[-\\s]?[Pp]icture)(.*)$",
+        },
+        float = true,
+        pin = true,
+        keep_aspect_ratio = true,
+        size = { 480, 270 },
+        move = { "monitor_w-window_w-20", "monitor_h-window_h-20" },
+    })
+
+    hl.window_rule({
         name   = "launcher-tui",
         match  = { class = "^omarchy-launcher-tui$" },
         float  = true,

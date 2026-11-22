@@ -8,5 +8,6 @@
     ../config/shell/athena/kuro.nix
     ../config/shell/athena/dynashell.nix
     ../config/terminal/tmux/tmux.nix
+    ../config/desktop/qute/qute.nix
   ];
 }

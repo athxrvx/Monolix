@@ -157,7 +157,6 @@ PanelWindow {
             field.text = "";
             root.query = "";
             root.resetSelection();
-            Wallpaper.refresh();
             field.forceActiveFocus();
         }
     }

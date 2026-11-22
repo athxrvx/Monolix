@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Read-only: find files by name under $HOME, bounded in time and results.
+set -euo pipefail
+
+die() {
+    echo "$1" >&2
+    exit "${2:-1}"
+}
+
+[[ $# == 1 ]] || die 'Usage: ai-find-file <name fragment>' 2
+query=$1
+[[ -n $query && ${#query} -le 80 ]] || die 'Search text must be 1-80 characters' 2
+[[ $query != *$'\n'* && $query != *$'\r'* ]] || die 'Search text must be one line' 2
+command -v fd >/dev/null 2>&1 || die 'fd is unavailable' 127
+
+mapfile -t matches < <(
+    timeout 10 fd --fixed-strings --type f --max-results 25 \
+        --exclude .git --exclude node_modules --exclude .cache \
+        --exclude .mozilla --exclude .steam --exclude .local/share/Trash \
+        --exclude .ssh --exclude .gnupg --exclude .password-store \
+        "$query" "$HOME" 2>/dev/null | sed "s|^${HOME}/||"
+)
+
+if (( ${#matches[@]} == 0 )); then
+    echo "No files matching '$query' under home."
+    exit 0
+fi
+
+printf 'Matches (%d):\n' "${#matches[@]}"
+for path in "${matches[@]}"; do
+    printf '  %s\n' "$path"
+done
