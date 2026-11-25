@@ -567,14 +567,14 @@ impl App {
             }
             "edit" => {
                 if args.len() > 1 { self.fail("usage: kuro edit [FILE]"); }
-                let editor = env::var("EDITOR").or_else(|_| env::var("VISUAL")).unwrap_or_else(|_| "nano".into());
+                let editor = env::var("EDITOR").or_else(|_| env::var("VISUAL")).unwrap_or_else(|_| "hx".into());
                 let target = args.first().and_then(|s| s.to_str()).unwrap_or("flake.nix");
                 let target = PathBuf::from(target);
                 let target = if target.is_absolute() { target } else { self.require_flake().join(target) };
                 if !target.exists() { self.fail(format!("file not found: {}", target.display())); }
                 let description = format!("open {}", target.display());
                 let mut editor_parts = editor.split_whitespace();
-                let editor_bin = editor_parts.next().unwrap_or("nano");
+                let editor_bin = editor_parts.next().unwrap_or("hx");
                 let mut editor_args: Vec<OsString> = editor_parts.map(Into::into).collect(); editor_args.push(target.into_os_string());
                 let mut all = vec![OsString::from(editor_bin)]; all.extend_from_slice(&editor_args);
                 self.handoff("edit", &description, &all);

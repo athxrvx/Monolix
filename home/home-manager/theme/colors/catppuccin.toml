@@ -33,3 +33,16 @@ bright_magenta = "#f5c2e7"
 
 # Catppuccin's mauve, which the palette above has no key for, for the app icons.
 icon_mark = "#cba6f7"
+
+# Complete Kuro semantic color contract.
+accent_text = "#1e1e2e"
+selection_foreground = "#cdd6f4"
+cursor = "#cdd6f4"
+cursor_text = "#1e1e2e"
+url = "#89b4fa"
+inactive_border = "#585b7088"
+active_border_color = "#89b4fa"
+active_tab_background = "#89b4fa"
+tab_active_foreground = "#1e1e2e"
+tab_inactive_background = "#313244"
+tab_inactive_foreground = "#cdd6f4"

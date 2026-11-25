@@ -1,0 +1,73 @@
+[language-server.nixd]
+command = "nixd"
+
+[language-server.pylsp]
+command = "pylsp"
+
+[language-server.typescript-language-server]
+command = "typescript-language-server"
+args = ["--stdio"]
+
+[language-server.bash-language-server]
+command = "bash-language-server"
+args = ["start"]
+
+[language-server.html]
+command = "vscode-html-language-server"
+args = ["--stdio"]
+
+[language-server.css]
+command = "vscode-css-language-server"
+args = ["--stdio"]
+
+[language-server.json]
+command = "vscode-json-language-server"
+args = ["--stdio"]
+
+[[language]]
+name = "nix"
+language-servers = ["nixd"]
+auto-format = true
+formatter = { command = "nixfmt" }
+
+[[language]]
+name = "python"
+language-servers = ["pylsp"]
+auto-format = true
+formatter = { command = "ruff", args = ["format", "-"] }
+
+[[language]]
+name = "typescript"
+language-servers = ["typescript-language-server"]
+auto-format = true
+formatter = { command = "prettierd", args = ["--stdin-filepath", "file.ts"] }
+
+[[language]]
+name = "javascript"
+language-servers = ["typescript-language-server"]
+auto-format = true
+formatter = { command = "prettierd", args = ["--stdin-filepath", "file.js"] }
+
+[[language]]
+name = "html"
+language-servers = ["html"]
+auto-format = true
+formatter = { command = "prettierd", args = ["--stdin-filepath", "file.html"] }
+
+[[language]]
+name = "css"
+language-servers = ["css"]
+auto-format = true
+formatter = { command = "prettierd", args = ["--stdin-filepath", "file.css"] }
+
+[[language]]
+name = "json"
+language-servers = ["json"]
+auto-format = true
+formatter = { command = "prettierd", args = ["--stdin-filepath", "file.json"] }
+
+[[language]]
+name = "bash"
+language-servers = ["bash-language-server"]
+auto-format = true
+formatter = { command = "shfmt", args = ["-i", "2"] }

@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Return the active wallpaper and a stable metadata index for Kuro."""
+
+import json
+import os
+import subprocess
+import sys
+
+
+def current_wallpaper() -> str:
+    try:
+        result = subprocess.run(
+            ["awww", "query"], capture_output=True, text=True, timeout=2, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    for line in result.stdout.splitlines():
+        marker = "image: "
+        if marker in line:
+            return line.split(marker, 1)[1].strip()
+    return ""
+
+
+def wallpapers(directory: str) -> list[dict[str, str]]:
+    root = os.path.abspath(os.path.expanduser(directory))
+    supported = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+    items = []
+    for base, dirs, files in os.walk(root, followlinks=True):
+        relative = os.path.relpath(base, root)
+        depth = 0 if relative == "." else relative.count(os.sep) + 1
+        if depth >= 1:
+            dirs[:] = []
+        else:
+            dirs.sort()
+        for name in sorted(files):
+            if os.path.splitext(name)[1].lower() not in supported:
+                continue
+            path = os.path.join(base, name)
+            try:
+                info = os.stat(path)
+            except OSError:
+                continue
+            if not os.path.isfile(path):
+                continue
+            items.append({
+                "path": path,
+                "signature": f"{info.st_size}:{info.st_mtime_ns}:{info.st_ino}",
+            })
+    items.sort(key=lambda item: item["path"])
+    return items
+
+
+def main() -> None:
+    directory = sys.argv[1] if len(sys.argv) > 1 else "~/Pictures/Wallpaper"
+    print(json.dumps({"current": current_wallpaper(), "items": wallpapers(directory)}))
+
+
+if __name__ == "__main__":
+    main()

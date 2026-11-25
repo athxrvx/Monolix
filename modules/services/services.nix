@@ -2,11 +2,11 @@
 {
   services.resolved = {
     enable = true;
-    settings.Resolve.DNSSEC = "allow-downgrade";   # strict "true" breaks on many ISP resolvers
+    settings.Resolve.DNSSEC = "allow-downgrade"; # strict "true" breaks on many ISP resolvers
   };
   services.earlyoom.enable = true;
-  services.fstrim.enable = true;   # weekly NVMe TRIM
-  services.fwupd.enable = true;    # firmware/BIOS updates
+  services.fstrim.enable = true; # weekly NVMe TRIM
+  services.fwupd.enable = true; # firmware/BIOS updates
   zramSwap.enable = true;
 
   services.portmaster.enable = true;
@@ -28,6 +28,11 @@
       __GLX_VENDOR_LIBRARY_NAME = "nvidia";
       CUDA_VISIBLE_DEVICES = "0";
     };
+  };
+
+  services.tailscale = {
+    enable = true;
+    openFirewall = true;
   };
 
   # Keep the Ollama unit available for the shell's explicit Start/Stop switch,

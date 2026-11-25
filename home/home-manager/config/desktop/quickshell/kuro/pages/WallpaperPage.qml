@@ -38,7 +38,7 @@ Page {
         spacing: 8
 
         SectionLabel { text: Wallpaper.images.length + " images" }
-        TextButton { text: "Refresh"; onClicked: Wallpaper.refresh() }
+        TextButton { text: "Refresh"; onClicked: Wallpaper.refresh(true) }
         TextButton {
             visible: Wallpaper.hasPicker
             primary: true
@@ -70,7 +70,7 @@ Page {
                 Image {
                     anchors.fill: parent
                     anchors.margins: 1
-                    source: "file://" + tile.modelData
+                    source: "file://" + Wallpaper.thumbnail(tile.modelData)
                     sourceSize.width: 360
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true

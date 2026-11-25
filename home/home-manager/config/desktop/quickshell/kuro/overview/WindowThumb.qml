@@ -92,13 +92,19 @@ Rectangle {
 
         property point start
         property bool dragging: false
+        property bool draggedThisGesture: false
 
-        onPressed: mouse => { start = Qt.point(mouse.x, mouse.y); dragging = false; }
+        onPressed: mouse => {
+            start = Qt.point(mouse.x, mouse.y);
+            dragging = false;
+            draggedThisGesture = false;
+        }
 
         onPositionChanged: mouse => {
             if (!(mouse.buttons & Qt.LeftButton)) return;
             if (!dragging && Math.hypot(mouse.x - start.x, mouse.y - start.y) > 8) {
                 dragging = true;
+                draggedThisGesture = true;
                 root.dragStarted(root.client, mapToItem(root.overlay, mouse.x, mouse.y));
             }
             if (dragging) root.dragMoved(mapToItem(root.overlay, mouse.x, mouse.y));
@@ -108,8 +114,11 @@ Rectangle {
             if (dragging) {
                 dragging = false;
                 root.dragEnded(mapToItem(root.overlay, mouse.x, mouse.y));
-                return;
             }
+        }
+
+        onClicked: mouse => {
+            if (draggedThisGesture) return;
             if (mouse.button === Qt.MiddleButton) OverviewState.closeWindow(root.client);
             else OverviewState.focusWindow(root.client);
         }

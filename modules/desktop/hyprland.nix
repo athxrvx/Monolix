@@ -96,7 +96,7 @@
     file-roller
     ffmpegthumbnailer
     poppler
-    hyprlandPlugins.hyprspace
+    android-tools
   ];
 
   # ============================================================

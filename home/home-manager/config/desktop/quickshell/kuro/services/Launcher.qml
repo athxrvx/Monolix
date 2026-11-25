@@ -385,14 +385,18 @@ Singleton {
     // 0 = no match. Higher is better: exact > prefix > word start > substring > in-order letters.
     function score(hay, q) {
         if (!hay) return 0;
-        hay = hay.toLowerCase();
-        if (hay === q) return 100;
-        if (hay.startsWith(q)) return 80 - Math.min(20, hay.length - q.length) * 0.5;
+        hay = String(hay).toLowerCase();
+        q = String(q).toLowerCase().trim();
+        if (!q) return 0;
+        if (hay === q) return 120;
+        // Do not penalize a useful, descriptive app title for being longer.
+        if (hay.startsWith(q)) return 100;
         const words = hay.split(/[\s\-_.]+/);
-        if (words.some(w => w.startsWith(q))) return 60;
+        if (words.includes(q)) return 92;
+        if (words.some(w => w.startsWith(q))) return 80;
         if (words.length > 1 && words.map(w => w[0]).join("").startsWith(q)) return 55;
         const idx = hay.indexOf(q);
-        if (idx >= 0) return 45 - Math.min(15, idx);
+        if (idx >= 0) return 50 - Math.min(20, idx);
         let i = 0, run = 0, best = 0;
         for (const ch of hay) {
             if (ch === q[i]) { i++; run++; best = Math.max(best, run); if (i === q.length) break; }
@@ -446,23 +450,27 @@ Singleton {
     }
 
     // ── Dynamic section items ────────────────────────────────────────
-    function appItems() {
-        return DesktopEntries.applications.values
+    // Desktop entry parsing and icon resolution are stable between app
+    // catalogue changes; keep them out of the per-keystroke search path.
+    readonly property var appCatalogue: DesktopEntries.applications.values
             // Flea exception removed: the app is disabled in this flake.
             // .filter(a => !a.noDisplay && !(String(a.id).toLowerCase().replace(".desktop", "") === "com.thisisgm.flea" || String(a.name).toLowerCase() === "flea"))
             .filter(a => !a.noDisplay)
             .map(a => ({
                 id: "app:" + a.id,
                 title: a.name,
+                appId: String(a.id ?? "").replace(/\.desktop$/i, ""),
+                isApp: true,
                 sub: a.genericName || a.comment || "",
                 icon: Quickshell.iconPath(a.icon, true),
                 glyph: String.fromCodePoint(0xF03D6),
                 keys: (a.keywords ?? []).join(" ") + " " + a.id,
                 hint: "app",
-                boost: Math.min(30, frecency(a.id) * 3),
+                desktopId: a.id,
                 run: { type: "app", entry: a }
             }));
-    }
+
+    function appItems() { return appCatalogue; }
 
     function containerItems(grouped = true) {
         const out = [];
@@ -533,6 +541,7 @@ Singleton {
     function liveItems(id) {
         switch (id) {
         case "control":          return LauncherControls.controlItems();
+        case "control-layout":   return LauncherControls.layoutItems();
         case "dev-profile":      return LauncherControls.profileItems();
         case "dev-network":      return LauncherControls.networkItems();
         case "dev-bluetooth":    return LauncherControls.bluetoothItems();
@@ -576,23 +585,35 @@ Singleton {
 
         const out = [];
         for (const it of items) {
+            const titleScore = score(it.title, q);
+            const appIdentityScore = it.isApp
+                ? Math.max(titleScore, score(it.appId, q))
+                : 0;
             const s = q === "" ? 1 : Math.max(
-                score(it.title, q) * 1.2,
+                titleScore * 1.2,
                 score(it.sub, q) * 0.6,
-                score(it.keys, q) * 0.8);
+                score(it.keys, q) * 0.8,
+                appIdentityScore * 1.2);
             if (s <= 0) continue;
+            const boost = it.isApp
+                ? Math.min(30, frecency(it.desktopId) * 3)
+                : (it.boost ?? 0);
             out.push({
                 kind: id,
                 title: it.title,
+                isApp: it.isApp === true,
                 sub: it.sub,
                 icon: it.icon ?? "",
                 glyph: it.glyph ?? Icons.settings,
                 hint: it.hint ?? "",
+                configPath: it.configPath ?? "",
                 danger: it.danger === true,
                 status: it.check ? (setupStatus[it.id] ?? "") : "",
                 submenu: it.run?.type === "enterSection",
                 section: sec.label,
-                score: s + (it.boost ?? 0),
+                // A direct app name/desktop-id match beats a settings row that
+                // only mentions that app. Keep fuzzy app matches at normal rank.
+                score: s + boost + (appIdentityScore >= 80 ? 32 : 0),
                 value: it.value ?? "",
                 control: it.control ?? "",
                 active: it.active === true,
@@ -610,7 +631,9 @@ Singleton {
         }
         // Keep the catalogue order for menus; sort by relevance only while searching.
         if (q !== "")
-            out.sort((x, y) => y.score - x.score || x.title.localeCompare(y.title));
+            out.sort((x, y) => y.score - x.score
+                || Number(y.isApp === true) - Number(x.isApp === true)
+                || x.title.localeCompare(y.title));
         return out.slice(0, 60);
     }
 
@@ -641,7 +664,9 @@ Singleton {
                                   score: s * 0.85, run: { type: "cmd", cmd: a.cmd } });
         }
 
-        out.sort((x, y) => y.score - x.score || x.title.localeCompare(y.title));
+        out.sort((x, y) => y.score - x.score
+            || Number(y.isApp === true) - Number(x.isApp === true)
+            || x.title.localeCompare(y.title));
         return out.slice(0, 50);
     }
 
@@ -755,6 +780,9 @@ Singleton {
         case "cmd":
             Quickshell.execDetached(x.cmd);
             break;
+        case "editor":
+            openConfig(x.path);
+            break;
         case "containerStop":
             stopContainer(x.name);
             break;
@@ -815,5 +843,10 @@ Singleton {
             break;
         }
         if (r.keepOpen !== true) open = false;
+    }
+
+    function openConfig(path) {
+        if (!path) return;
+        Quickshell.execDetached(Config.terminal.concat(["hx", path]));
     }
 }

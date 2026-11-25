@@ -8,6 +8,7 @@
     ZSH_CONFIG_HOME = "${config.xdg.configHome}/zsh";
     ZSH_CACHE_DIR = "${config.xdg.configHome}/zsh/cache";
   };
+  home.packages = [ pkgs.any-nix-shell ];
 
   # Use the packaged zoxide integration instead of Kuro's native fallback,
   # which shelled out to sort/head/mv on every cd and broke with a bad PATH.
@@ -44,6 +45,10 @@
 
       # Kuro's plugins, prompt and generated palette (from ~/.cache/kuro).
       [[ -r "$HOME/.config/zsh/zshrc" ]] && source "$HOME/.config/zsh/zshrc"
+
+      # Keep nix-shell and nix run interactive sessions on this same Zsh setup.
+      # --info-right replaces RPROMPT every prompt and hides Kuro's right-side indicators.
+      ${pkgs.any-nix-shell}/bin/any-nix-shell zsh | source /dev/stdin
     '';
   };
 

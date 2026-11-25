@@ -13,6 +13,8 @@ in
   home.packages = with pkgs; [
     quickshell
     awww
+    imagemagick
+    pciutils
     # AI sidebar: YouTube search/playback and desktop application launching.
     yt-dlp
     dex

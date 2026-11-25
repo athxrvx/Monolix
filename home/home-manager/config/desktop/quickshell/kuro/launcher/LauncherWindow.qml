@@ -24,11 +24,15 @@ PanelWindow {
     property string query: ""
     property int current: 0
     property int currentAction: 0
+    property bool keyboardMode: false
     property var confirmationAction: null
 
     // Hover flyout state (description moved out of the rows to stay minimal).
     property string tipText: ""
     property real tipY: 0
+    property bool pointerPositionKnown: false
+    property real lastPointerX: 0
+    property real lastPointerY: 0
 
     readonly property var results: Launcher.open ? Launcher.search(query) : []
     readonly property bool browsing: query.trim() === ""
@@ -77,10 +81,33 @@ PanelWindow {
     function showTip(row) {
         const s = row.result.sub ?? "";
         if (s === "") { tipText = ""; return; }
-        tipY = panel.y + row.mapToItem(panel, 0, row.height / 2).y;
+        const y = panel.y + row.mapToItem(panel, 0, row.height / 2).y;
+        if (tipText === s && Math.abs(tipY - y) < 1) return;
+        tipY = y;
         tipText = s;
     }
     function hideTip() { tipText = ""; }
+
+    // Delegate-local mouse coordinates can change when the result list is
+    // rebuilt even though the physical pointer did not move. Use global
+    // coordinates so that layout churn cannot repeatedly steal selection
+    // from keyboard navigation or flicker the hover state.
+    function pointerMoved(item, x, y) {
+        const point = item.mapToGlobal(Qt.point(x, y));
+        const moved = !pointerPositionKnown
+            || Math.abs(point.x - lastPointerX) + Math.abs(point.y - lastPointerY) > 1;
+        pointerPositionKnown = true;
+        lastPointerX = point.x;
+        lastPointerY = point.y;
+        return moved;
+    }
+
+    function selectFromPointer(row, index, x, y) {
+        if (!pointerMoved(row, x, y)) return;
+        keyboardMode = false;
+        current = index;
+        showTip(row);
+    }
 
     function selectSection(id) {
         field.text = "";
@@ -92,6 +119,7 @@ PanelWindow {
 
     function move(d) {
         if (results.length === 0) return;
+        keyboardMode = true;
         let next = current;
         for (let i = 0; i < results.length; i++) {
             next = (next + d + results.length) % results.length;
@@ -137,6 +165,11 @@ PanelWindow {
         Launcher.run(r);
     }
 
+    function openConfig(path) {
+        Launcher.openConfig(path);
+        Launcher.open = false;
+    }
+
     function resolveConfirmation(yes) {
         const action = confirmationAction;
         confirmationAction = null;
@@ -154,6 +187,7 @@ PanelWindow {
         function onDrilledChanged() { root.resetSelection(); }
         function onOpenChanged() {
             if (!Launcher.open) { root.hideTip(); return; }
+            root.keyboardMode = false;
             field.text = "";
             root.query = "";
             root.resetSelection();
@@ -163,6 +197,8 @@ PanelWindow {
 
     onQueryChanged: {
         if (confirmationAction) return;
+        list.smoothScrolling = false;
+        wheelSettle.stop();
         resetSelection();
         if (query.startsWith(":clip") && Clipboard.items.length === 0) Clipboard.refresh();
         if (query.startsWith(":file")) Launcher.findFiles(query.slice(5));
@@ -243,6 +279,7 @@ PanelWindow {
                             }
 
                             Keys.onPressed: event => {
+                                root.keyboardMode = true;
                                 const ctrl = event.modifiers & Qt.ControlModifier;
                                 if (event.key === Qt.Key_Escape) {
                                     if (text !== "") text = "";
@@ -299,6 +336,14 @@ PanelWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
+                // Keep the pointer shape stable while search results are
+                // replaced/reused underneath it. Per-row cursor overrides
+                // caused a one-frame fallback between delegate lifetimes.
+                HoverHandler {
+                    enabled: root.results.length > 0
+                    cursorShape: Qt.PointingHandCursor
+                }
+
                 Text {
                     anchors.centerIn: parent
                     visible: root.results.length === 0
@@ -311,13 +356,31 @@ PanelWindow {
 
                 ListView {
                     id: list
+                    property real wheelTargetY: 0
+                    property bool smoothScrolling: false
                     anchors.fill: parent
                     clip: true
                     model: root.results
                     currentIndex: root.current
+                    reuseItems: true
                     boundsBehavior: Flickable.StopAtBounds
                     highlightMoveDuration: 100
                     highlightResizeDuration: 0
+                    Behavior on contentY {
+                        enabled: list.smoothScrolling
+                        NumberAnimation {
+                            duration: 140
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                    Timer {
+                        id: wheelSettle
+                        interval: 180
+                        onTriggered: {
+                            list.wheelTargetY = list.contentY;
+                            list.smoothScrolling = false;
+                        }
+                    }
 
                     delegate: Item {
                         id: row
@@ -420,6 +483,30 @@ PanelWindow {
                                 }
                             }
 
+                            Item {
+                                visible: !!row.result.configPath
+                                Layout.preferredWidth: visible ? 34 : 0
+                                Layout.minimumWidth: visible ? 34 : 0
+                                Layout.maximumWidth: visible ? 34 : 0
+                                Layout.preferredHeight: 24
+                                z: 2
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Nix ↗"
+                                    color: configMouse.containsMouse ? root.cAccent : root.cDim
+                                    font.family: Theme.font
+                                    font.pixelSize: 10
+                                }
+
+                                MouseArea {
+                                    id: configMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: root.openConfig(row.result.configPath)
+                                }
+                            }
+
                             // Status / category number / search tag
                             Text {
                                 Layout.maximumWidth: 96
@@ -487,8 +574,16 @@ PanelWindow {
                                         anchors.fill: parent
                                         enabled: modelData.enabled
                                         hoverEnabled: true
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         onEntered: {
+                                            if (root.pointerMoved(row, actionMouse.mouseX, actionMouse.mouseY)) {
+                                                root.keyboardMode = false;
+                                                root.current = row.index;
+                                                root.currentAction = index;
+                                            }
+                                        }
+                                        onPositionChanged: mouse => {
+                                            if (!root.pointerMoved(row, mouse.x, mouse.y)) return;
+                                            root.keyboardMode = false;
                                             root.current = row.index;
                                             root.currentAction = index;
                                         }
@@ -530,23 +625,57 @@ PanelWindow {
                         MouseArea {
                             id: rowMouse
                             anchors.fill: parent
+                            z: -1
                             enabled: !(row.result.kind === "containers"
                                           && (row.result.containerOptionsLabel || row.result.containerActionStrip))
                             hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onEntered: {
-                                root.current = row.index;
-                                root.showTip(row);
-                            }
+                            onEntered: root.selectFromPointer(row, row.index, rowMouse.mouseX, rowMouse.mouseY)
+                            onPositionChanged: mouse => root.selectFromPointer(row, row.index, mouse.x, mouse.y)
                             onExited: root.hideTip()
                             onClicked: root.activate(row.index)
                             onWheel: wheel => {
-                                if (!row.result.adjust) return;
-                                root.current = row.index;
-                                root.adjustCurrent(wheel.angleDelta.y > 0 ? 1 : -1);
+                                const usesPixels = wheel.pixelDelta.y !== 0;
+                                const delta = usesPixels
+                                    ? wheel.pixelDelta.y * 0.65
+                                    : wheel.angleDelta.y / 120 * root.rowH * 0.72;
+                                if (delta === 0) return;
+                                if (row.result.adjust) {
+                                    root.current = row.index;
+                                    root.adjustCurrent(delta > 0 ? 1 : -1);
+                                } else {
+                                    if (!wheelSettle.running)
+                                        list.wheelTargetY = list.contentY;
+                                    list.smoothScrolling = true;
+                                    list.wheelTargetY = Math.max(0, Math.min(
+                                        list.contentHeight - list.height,
+                                        list.wheelTargetY - delta));
+                                    list.contentY = list.wheelTargetY;
+                                    wheelSettle.restart();
+                                }
                                 wheel.accepted = true;
                             }
                         }
+                    }
+                }
+
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right
+                    width: 3
+                    radius: 1.5
+                    color: root.cSurface
+                    visible: list.contentHeight > list.height
+
+                    Rectangle {
+                        width: parent.width
+                        height: Math.min(parent.height, Math.max(24,
+                            parent.height * list.height / Math.max(1, list.contentHeight)))
+                        radius: parent.radius
+                        color: root.cAccent
+                        y: list.contentHeight <= list.height ? 0
+                            : list.contentY / (list.contentHeight - list.height)
+                                * (parent.height - height)
                     }
                 }
 

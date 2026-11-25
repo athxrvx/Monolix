@@ -90,7 +90,7 @@ Singleton {
         // ── 02 Control ───────────────────────────────────────────────
         {
             id: "control", num: "02", label: "Control",
-            sub: "Network, Bluetooth, sound and display",
+            sub: "Window layout, network, Bluetooth, sound and display",
             glyph: Icons.wifi,
             keys: "control devices network wifi bluetooth sound audio display brightness",
             items: []
@@ -106,13 +106,15 @@ Singleton {
                 // Desktop
                 {
                     id: "setupHypr", title: "Hyprland config",
-                    sub: "Desktop · ~/.config/hypr/hyprland.lua",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/hyprland/hyprland.nix",
+                    sub: "Desktop · nixconfig/home/home-manager/config/desktop/hyprland/hyprland.nix",
                     glyph: g(0xF08C7), keys: "hyprland compositor desktop config",  // md-arch
                     hint: "config", check: "test -f \"$HOME/.config/hypr/hyprland.lua\"",
-                    run: { type: "url", url: "file://" + Config.home + "/.config/hypr/hyprland.lua" }
+                    run: { type: "editor", path: Config.nixConfigDir + "/home/home-manager/config/desktop/hyprland/hyprland.nix" }
                 },
                 {
                     id: "setupReload", title: "Reload Hyprland",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/hyprland/hyprland.nix",
                     sub: "Desktop · apply config changes now",
                     glyph: g(0xF0450), keys: "reload refresh desktop config",  // md-refresh
                     hint: "cmd", check: "command -v hyprctl >/dev/null",
@@ -120,21 +122,24 @@ Singleton {
                 },
                 {
                     id: "setupShell", title: "Shell config",
-                    sub: "Shell · ~/.zshrc or ~/.bashrc",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/shell/zsh/zsh.nix",
+                    sub: "Shell · nixconfig/home/home-manager/config/shell/zsh/zsh.nix",
                     glyph: g(0xF018D), keys: "zsh bash fish shell config prompt",  // md-console
-                    hint: "config", check: "test -f \"$HOME/.zshrc\" || test -f \"$HOME/.bashrc\"",
-                    run: { type: "url", url: "file://" + Config.home + "/.zshrc" }
+                    hint: "config", check: "test -f \"$HOME/.config/zsh/.zshrc\" || test -f \"$HOME/.bashrc\"",
+                    run: { type: "editor", path: Config.nixConfigDir + "/home/home-manager/config/shell/zsh/zsh.nix" }
                 },
                 // Terminal
                 {
                     id: "setupKitty", title: "Kitty config",
-                    sub: "Terminal · ~/.config/kitty/kitty.conf",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/kitty/kitty.nix",
+                    sub: "Terminal · nixconfig/home/home-manager/config/desktop/kitty/kitty.nix",
                     glyph: g(0xF489), keys: "kitty terminal font config",  // oct-terminal
                     hint: "config", check: "test -f \"$HOME/.config/kitty/kitty.conf\"",
-                    run: { type: "url", url: "file://" + Config.home + "/.config/kitty/kitty.conf" }
+                    run: { type: "editor", path: Config.nixConfigDir + "/home/home-manager/config/desktop/kitty/kitty.nix" }
                 },
                 {
                     id: "setupTerm", title: "Open a terminal",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/kitty/kitty.nix",
                     sub: "Terminal · kitty",
                     glyph: g(0xF489), keys: "terminal shell console kitty",
                     hint: "cmd", check: "command -v kitty >/dev/null",
@@ -143,27 +148,31 @@ Singleton {
                 // Development
                 {
                     id: "setupGit", title: "Git config",
-                    sub: "Development · ~/.gitconfig",
+                    configPath: Config.nixConfigDir + "/home/home-manager/core/development.nix",
+                    sub: "Development · nixconfig/home/home-manager/core/development.nix",
                     glyph: g(0xF062C), keys: "git version control development config",
                     hint: "config", check: "test -f \"$HOME/.gitconfig\"",
-                    run: { type: "url", url: "file://" + Config.home + "/.gitconfig" }
+                    run: { type: "editor", path: Config.nixConfigDir + "/home/home-manager/core/development.nix" }
                 },
                 {
-                    id: "setupNvim", title: "Neovim config",
-                    sub: "Development · ~/.config/nvim",
-                    glyph: g(0xF36F), keys: "neovim nvim editor development config",  // linux-neovim
-                    hint: "config", check: "test -d \"$HOME/.config/nvim\"",
-                    run: { type: "url", url: "file://" + Config.home + "/.config/nvim" }
+                    id: "setupHelix", title: "Helix config",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/development/helix/helix.nix",
+                    sub: "Development · nixconfig/home/home-manager/config/development/helix/helix.nix",
+                    glyph: g(0xF36F), keys: "helix hx editor development config",
+                    hint: "config", check: "command -v hx >/dev/null",
+                    run: { type: "editor", path: Config.nixConfigDir + "/home/home-manager/config/development/helix/helix.nix" }
                 },
                 // Input / Audio / Network / Utilities
                 {
                     id: "setupKeys", title: "Keybindings",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/hyprland/conf.d/keybinds.lua",
                     sub: "Input · shortcuts and hotkeys",
                     glyph: Icons.keyboard, keys: "keyboard input shortcuts keybinds",
                     hint: "browse", run: { type: "enterSection", id: "sys-keybinds" }
                 },
                 {
                     id: "setupAudio", title: "Audio devices",
+                    configPath: Config.nixConfigDir + "/modules/audio/audio.nix",
                     sub: "Audio · PipeWire / WirePlumber",
                     glyph: Icons.volume, keys: "pipewire wireplumber sound audio microphone",
                     hint: "browse", check: "command -v wireplumber >/dev/null",
@@ -171,12 +180,14 @@ Singleton {
                 },
                 {
                     id: "setupBt", title: "Bluetooth devices",
+                    configPath: Config.nixConfigDir + "/modules/bluetooth/bluetooth.nix",
                     sub: "Input · pair headsets and controllers",
                     glyph: Icons.bluetooth, keys: "bluetooth pair headset earbuds device",
                     hint: "browse", run: { type: "enterSection", id: "dev-bluetooth" }
                 },
                 {
                     id: "setupNet", title: "NetworkManager",
+                    configPath: Config.nixConfigDir + "/modules/system/network.nix",
                     sub: "Networking · Wi-Fi and Ethernet",
                     glyph: Icons.wifi, keys: "networkmanager nmcli wifi ethernet internet",
                     hint: "browse", check: "command -v nmcli >/dev/null",
@@ -184,6 +195,7 @@ Singleton {
                 },
                 {
                     id: "setupShot", title: "Screenshot",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/hyprland/hyprland.nix",
                     sub: "Utilities · select an area with grim + slurp",
                     glyph: g(0xF0100), keys: "screenshot capture screen grim slurp",  // md-camera
                     hint: "cmd", check: "command -v grim >/dev/null && command -v slurp >/dev/null",
@@ -191,12 +203,14 @@ Singleton {
                 },
                 {
                     id: "setupClip", title: "Clipboard history",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/hyprland/hyprland.nix",
                     sub: "Utilities · copy and paste manager",
                     glyph: Icons.clipboard, keys: "clipboard copy paste history cliphist",
                     hint: "browse", run: { type: "enterSection", id: "sys-clipboard" }
                 },
                 {
                     id: "setupNotif", title: "Notifications",
+                    configPath: Config.nixConfigDir + "/home/home-manager/config/desktop/quickshell/kuro/quickshell.nix",
                     sub: "Utilities · Do Not Disturb and history",
                     glyph: Icons.bell, keys: "notifications dnd alerts",
                     hint: "browse", run: { type: "enterSection", id: "sys-notifications" }
@@ -204,6 +218,7 @@ Singleton {
                 // Backup
                 {
                     id: "setupBackup", title: "Backup configs",
+                    configPath: Config.nixConfigDir + "/flake.nix",
                     sub: "Backup · archive dotfiles to ~/Backups",
                     glyph: g(0xF003C), keys: "backup archive dotfiles configs",  // md-archive
                     hint: "terminal",
@@ -211,6 +226,7 @@ Singleton {
                 },
                 {
                     id: "setupRestore", title: "Restore configs",
+                    configPath: Config.nixConfigDir + "/flake.nix",
                     sub: "Backup · extract an archive over ~/  (overwrites files)",
                     glyph: g(0xF1259), keys: "restore recover backup configs",  // md-archive_arrow_down
                     hint: "terminal", danger: true,
@@ -325,7 +341,7 @@ Singleton {
             id: "system", num: "06", label: "System",
             sub: "Notifications, clipboard and maintenance",
             glyph: g(0xF048B),                                   // md-server
-            keys: "system hardware services processes storage logs maintenance notifications clipboard",
+            keys: "system hardware storage logs maintenance notifications clipboard",
             items: [
                 {
                     id: "sysOverview", title: "System overview",
@@ -353,37 +369,24 @@ Singleton {
                 },
                 {
                     id: "sysInfo", title: "Hardware info",
-                    sub: "fastfetch  ·  CPU, GPU, RAM, disks",
+                    sub: "CPU, GPU, memory, display and system details",
                     glyph: g(0xF0EE0), keys: "hardware cpu gpu ram memory disks fastfetch",  // md-cpu_64_bit
-                    hint: "terminal", check: "command -v fastfetch >/dev/null",
-                    run: { type: "popupTerminal", cmd: "fastfetch; exec bash" }
-                },
-                {
-                    id: "sysProcesses", title: "Processes",
-                    sub: "htop  ·  running processes and load",
-                    glyph: g(0xF07B1), keys: "processes tasks htop top load monitor",  // md-chart_line_variant
-                    hint: "terminal", check: "command -v htop >/dev/null",
-                    run: { type: "popupTerminal", cmd: "htop" }
-                },
-                {
-                    id: "sysServices", title: "Services",
-                    sub: "systemctl --user  ·  list and manage units",
-                    glyph: g(0xF1460), keys: "services systemd systemctl units start stop enable",
-                    hint: "terminal", check: "command -v systemctl >/dev/null",
-                    run: { type: "popupTerminal", cmd: "systemctl --user list-units --type=service --no-pager | less; exec bash" }
+                    hint: "dashboard",
+                    run: { type: "cmd", cmd: ["qs", "-c", "shell", "ipc", "call", "monitor", "page", "hardware"] }
                 },
                 {
                     id: "sysStorage", title: "Disk usage",
-                    sub: "df -h  ·  filesystem usage and mounts",
+                    sub: "Filesystem, mount and capacity usage",
                     glyph: g(0xF02CA), keys: "storage disk usage mounts df space",  // md-harddisk
-                    hint: "terminal", run: { type: "popupTerminal", cmd: "df -h; echo; lsblk -o NAME,SIZE,TYPE,MOUNTPOINT; exec bash" }
+                    hint: "dashboard",
+                    run: { type: "cmd", cmd: ["qs", "-c", "shell", "ipc", "call", "monitor", "page", "storage"] }
                 },
                 {
                     id: "sysLogs", title: "System logs",
-                    sub: "journalctl  ·  last 200 boot entries",
+                    sub: "Browse recent boot journal entries",
                     glyph: g(0xF02DA), keys: "logs journal journalctl errors debug",
-                    hint: "terminal", check: "command -v journalctl >/dev/null",
-                    run: { type: "terminal", cmd: "journalctl -b -n 200 --no-pager | less; exec bash" }
+                    hint: "dashboard",
+                    run: { type: "cmd", cmd: ["qs", "-c", "shell", "ipc", "call", "monitor", "page", "logs"] }
                 },
                 {
                     id: "sysCache", title: "Cache cleanup",
@@ -444,7 +447,7 @@ Singleton {
                     sub: "Colorschemes, fonts and desktop settings",
                     glyph: g(0xF0DC9), keys: "kuro config edit settings toml theme fonts",
                     hint: "config", check: "test -f \"$HOME/.config/kuro/kuro.toml\"",
-                    run: { type: "url", url: "file://" + Config.kuroConfig }
+                    run: { type: "editor", path: Config.kuroConfig }
                 },
                 {
                     id: "styleApply", title: "Apply Kuro settings",
@@ -467,6 +470,12 @@ Singleton {
         // ─────────────────────────────────────────────────────────────
         // Control submenus (rows come from services/LauncherControls.qml)
         // ─────────────────────────────────────────────────────────────
+        {
+            id: "control-layout", label: "Layout", hidden: true,
+            sub: "Choose the active workspace window layout", glyph: Icons.overview,
+            keys: "layout tiling master dwindle scrolling niri columns",
+            items: []
+        },
         {
             id: "dev-profile", label: "System profile", hidden: true,
             sub: "Live CPU, memory and GPU monitor", glyph: Icons.cpu,
@@ -562,7 +571,7 @@ Singleton {
                     sub: "Quickshell/shell/lock/LockScreen.qml",
                     glyph: g(0xF0DC9), keys: "quickshell config lock screen edit qml",
                     hint: "config", check: "test -f \"$HOME/.config/quickshell/shell/lock/LockScreen.qml\"",
-                    run: { type: "url", url: "file://" + Config.home + "/.config/quickshell/shell/lock/LockScreen.qml" }
+                    run: { type: "editor", path: Config.home + "/.config/quickshell/shell/lock/LockScreen.qml" }
                 }
             ]
         },

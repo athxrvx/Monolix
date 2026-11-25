@@ -138,7 +138,7 @@ shell/
 │   ├── Module.qml          every bar module and its click actions
 │   └── ...                 Workspaces, Tray, ClockItem, CalendarPopup
 ├── bin/
-│   ├── kurogen             kuro.toml -> theme.json, kuro.lua, kuro.conf
+│   ├── kurogen             kuro.toml -> theme.json, kuro.lua, kuro.conf, Helix theme
 │   ├── fzpac               vendored fzpac TUI
 │   ├── controlcenter       launcher: toggle / open / start
 │   └── bar-layout          rofi picker for bar layouts
@@ -197,7 +197,7 @@ local fileManager = (kuro and kuro.apps and kuro.apps.fileManager) or "dolphin"
 local menu        = (kuro and kuro.apps and kuro.apps.menu) or "qs -c shell ipc call launcher toggle"
 ```
 
-`kurogen` writes `~/.config/hypr/kuro.lua` from `kuro.toml` (colors, gaps, rounding, blur, input layout) and `~/.config/kitty/kuro.conf` for kitty. `kitty.conf` only needs:
+`kurogen` writes `~/.config/hypr/kuro.lua` from `kuro.toml` (colors, gaps, rounding, blur, input layout), `~/.config/kitty/kuro.conf` for kitty, and `~/.config/helix/themes/kuro.toml` for Helix. The Helix theme follows the active Kuro palette. `kitty.conf` only needs:
 
 ```conf
 include ~/.config/kitty/kuro.conf
@@ -220,7 +220,7 @@ hl.bind("SUPER + space",          hl.dsp.exec_cmd("qs -c shell ipc call launcher
 hl.bind("SUPER + SHIFT + Return", hl.dsp.exec_cmd("kitty"))
 hl.bind("SUPER + A",              hl.dsp.exec_cmd(controlcenter))
 hl.bind("SUPER + V",              hl.dsp.exec_cmd(controlcenter .. " open clipboard"))
-hl.bind("SUPER + TAB",            hl.dsp.exec_cmd("qs -c shell ipc call overview toggle"))
+hl.bind("SUPER + TAB", function() hl.plugin.overview.toggle() end)
 hl.bind("SUPER + N",              hl.dsp.exec_cmd("qs -c shell ipc call notifications toggle"))
 hl.bind("SUPER + B",              hl.dsp.exec_cmd(barLayout))
 hl.bind("SUPER + Q",              hl.dsp.window.close())
@@ -239,7 +239,7 @@ The bar's launcher button and `SUPER + space` open a minimal nested-menu launche
 - Prefixes still work: `:clip`, `:wall`, `:file`, `:win`, `> command`, `? query`.
 - Hover a row to see its description in a tooltip, so rows stay one line.
 
-The **Style** section lists every colorscheme in `~/.config/kuro/themes/` and the related actions (wallpaper, fonts, square corners, blur, bar layout). Selecting a theme rewrites `[theme].scheme` in `kuro.toml` and regenerates Hyprland, kitty and the shell.
+The Style section lists each colorscheme and the related wallpaper and font actions.
 
 Package actions use the vendored `bin/fzpac` inside a floating, centered kitty window (class `omarchy-launcher-tui`) that closes when the TUI exits.
 
@@ -324,7 +324,7 @@ wallpaper_dir = "~/Pictures/Wallpaper"
 Each colorscheme is a standalone TOML in `~/.config/kuro/themes/` (Omarchy `colors.toml` format). Shipped themes: Jellybeans, Tokyo Night, Kanagawa, Catppuccin, Everforest, Rosé Pine, Gruvbox, Nord, Miasma, Solitude and Matte Black.
 
 ```sh
-kurogen                 # regenerate theme.json, kuro.lua and kuro.conf
+kurogen                 # regenerate desktop colors and the Helix theme
 kurogen themes          # list colorschemes (* = active)
 kurogen scheme nord     # switch colorscheme
 kurogen set theme.gaps_in 8

@@ -144,45 +144,45 @@ PopupWindow {
         chatError = "";
         const payload = JSON.stringify({
             model: model,
-            messages: [{ role: "system", content: "You are Kuro, the local AI navigator built into the Kuro desktop shell. Personality: warm, sharp, concise, quietly playful, and practical. You speak like a trusted navigator: direct about tradeoffs, calm under pressure, never dramatic, and you keep answers short unless the user asks for detail. You may request only the provided allowlisted actions: theme, font, wallpaper, night light, focus mode, timers, containers, YouTube, app launching, brightness, and read-only status lookups (media, system stats, disk, weather, todos, containers, and file search). Read-only status lookups run immediately without approval. Never invent commands, scripts, file paths, or results. All other action requests are proposals: recommend the closest tool, wait for the user's approval, and never claim an action ran before it did. After a script runs, base your reply on its returned output and exit status; approval alone is not success. If the script says no verification output was produced, do not claim the requested setting or change was confirmed; report only that the script exited successfully without confirming the resulting state." }].concat(modelMessages),
+            messages: [{ role: "system", content: "You are Kuro, the local AI navigator built into the Kuro desktop shell. Personality: warm, sharp, concise, quietly playful, and practical. You speak like a trusted navigator: direct about tradeoffs, calm under pressure, never dramatic, and you keep answers short unless the user asks for detail. You may request only the provided allowlisted actions: theme, font, wallpaper, night light, focus mode, timers, containers, YouTube, app launching, brightness, and read-only status lookups (media, system stats, disk, weather, todos, containers, and file search). Read-only status lookups and low-risk desktop controls (theme, font, wallpaper, night light, focus mode, timers) run immediately when requested; do not ask the user to approve them or show a run-script prompt. Brightness changes, app launches, media playback, container operations, and other consequential actions require the applet's confirmation. Never invent commands, scripts, file paths, or results. Never claim an action ran before it did. After an action runs, base your reply on its returned output and exit status. If the result says no verification output was produced, report only that it exited successfully without confirming the resulting state." }].concat(modelMessages),
             stream: false,
             tools: [
                 { type: "function", function: {
                     name: "kuro_set_theme",
-                    description: "Change the Kuro colorscheme. Available ids: " + Config.kuroSchemes.map(item => item.id).join(", ") + ". rose-pine is the only light theme; every other available theme is dark. Use the id, not the display name. Ask for approval before using.",
+                    description: "Change the Kuro colorscheme immediately when the user asks. This is a low-risk reversible desktop setting and does not require approval. Available ids: " + Config.kuroSchemes.map(item => item.id).join(", ") + ". rose-pine is the only light theme; every other available theme is dark. Use the id, not the display name.",
                     parameters: { type: "object", properties: {
                         theme: { type: "string", enum: Config.kuroSchemes.map(item => item.id), description: "Theme id. rose-pine is light; the rest are dark." }
                     }, required: ["theme"], additionalProperties: false }
                 } },
                 { type: "function", function: {
                     name: "kuro_set_font",
-                    description: "Change the UI, shell, bar, and terminal font to one approved Nerd Font: JetBrainsMono, CaskaydiaCove, FiraCode, or Iosevka. Ask for approval before using.",
+                    description: "Change the UI, shell, bar, and terminal font immediately when the user asks. This is a low-risk reversible desktop setting and does not require approval. Choose one approved Nerd Font: JetBrainsMono, CaskaydiaCove, FiraCode, or Iosevka.",
                     parameters: { type: "object", properties: {
                         family: { type: "string", enum: ["JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font", "FiraCode Nerd Font", "Iosevka Nerd Font"], description: "Exact approved font family name." }
                     }, required: ["family"], additionalProperties: false }
                 } },
                 { type: "function", function: {
                     name: "kuro_random_wallpaper",
-                    description: "Apply a random image from the user's configured wallpaper folder. Only the wallpaper changes; the colorscheme stays the same. Ask for approval before using.",
+                    description: "Apply a random image from the user's configured wallpaper folder immediately when the user asks. This is a low-risk reversible desktop setting and does not require approval. Only the wallpaper changes; the colorscheme stays the same.",
                     parameters: { type: "object", properties: {}, additionalProperties: false }
                 } },
                 { type: "function", function: {
                     name: "kuro_night_light",
-                    description: "Control night light via hyprsunset. on = 4500K, warm = 3500K (best at night), cool = 5000K (best in daylight), off = stop, toggle = flip current state. Ask for approval before using.",
+                    description: "Control night light immediately when the user asks. This is a low-risk reversible desktop setting and does not require approval. on = 4500K, warm = 3500K (best at night), cool = 5000K (best in daylight), off = stop, toggle = flip current state.",
                     parameters: { type: "object", properties: {
                         mode: { type: "string", enum: ["on", "off", "warm", "cool", "toggle"], description: "Night light mode and warmth." }
                     }, required: ["mode"], additionalProperties: false }
                 } },
                 { type: "function", function: {
                     name: "kuro_focus_mode",
-                    description: "Focus mode. on = enable Do Not Disturb and block idle sleep; off = restore both; toggle = flip. Use it for deep work, study, or meetings. Ask for approval before using.",
+                    description: "Control focus mode immediately when the user asks. This is a reversible desktop setting and does not require approval. on = enable Do Not Disturb and block idle sleep; off = restore both; toggle = flip. Use it for deep work, study, or meetings.",
                     parameters: { type: "object", properties: {
                         mode: { type: "string", enum: ["on", "off", "toggle"], description: "Whether to enable, disable, or flip focus mode." }
                     }, required: ["mode"], additionalProperties: false }
                 } },
                 { type: "function", function: {
                     name: "kuro_set_timer",
-                    description: "Set one one-shot timer that sends a desktop notification when it finishes. Timers run independently and can overlap. Ask for approval before using.",
+                    description: "Set a one-shot timer immediately when the user asks. Timers run independently, can overlap, and send a desktop notification when they finish. This does not require approval.",
                     parameters: { type: "object", properties: {
                         seconds: { type: "integer", minimum: 1, maximum: 86400, description: "Duration in seconds (1 second to 24 hours)." },
                         label: { type: "string", pattern: "^[A-Za-z0-9 _-]{0,48}$", description: "Optional short label shown in the notification; letters, numbers, spaces, _ and -." }
@@ -276,28 +276,28 @@ PopupWindow {
         const validPackage = value => /^[a-z0-9][a-z0-9+._-]{0,63}$/.test(String(value ?? ""));
         if (name === "kuro_set_theme") {
             const theme = Config.kuroSchemes.find(item => item.id === String(args.theme ?? ""));
-            if (theme) return { name, title: "Change theme to " + theme.name, script: "ai-theme", args: [theme.id] };
+            if (theme) return { name, title: "Change theme to " + theme.name, script: "ai-theme", args: [theme.id], autoRun: true };
         } else if (name === "kuro_set_font") {
             const family = String(args.family ?? "");
             if (["JetBrainsMono Nerd Font", "CaskaydiaCove Nerd Font", "FiraCode Nerd Font", "Iosevka Nerd Font"].includes(family))
-                return { name, title: "Change shell, bar, and terminal font", detail: family, script: "ai-font", args: [family] };
+                return { name, title: "Change shell, bar, and terminal font", detail: family, script: "ai-font", args: [family], autoRun: true };
         } else if (name === "kuro_random_wallpaper") {
-            return { name, title: "Apply a random wallpaper", script: "ai-wallpaper", args: [Config.wallpaperDir] };
+            return { name, title: "Apply a random wallpaper", script: "ai-wallpaper", args: [Config.wallpaperDir], autoRun: true };
         } else if (name === "kuro_night_light") {
             const mode = String(args.mode ?? "");
             if (["on", "off", "warm", "cool", "toggle"].includes(mode))
-                return { name, title: "Night light: " + mode, script: "ai-nightlight", args: [mode] };
+                return { name, title: "Night light: " + mode, script: "ai-nightlight", args: [mode], autoRun: true };
         } else if (name === "kuro_focus_mode") {
             const mode = String(args.mode ?? "");
             if (["on", "off", "toggle"].includes(mode))
-                return { name, title: "Focus mode: " + mode, script: "ai-focus", args: [mode] };
+                return { name, title: "Focus mode: " + mode, script: "ai-focus", args: [mode], autoRun: true };
         } else if (name === "kuro_set_timer") {
             const seconds = Number(args.seconds);
             const label = String(args.label ?? "").trim() || "Timer";
             if (Number.isInteger(seconds) && seconds >= 1 && seconds <= 86400 &&
                 label.length <= 48 && /^[A-Za-z0-9 _-]*$/.test(label))
                 return { name, title: "Set a timer for " + seconds + "s", detail: label,
-                         script: "ai-timer", args: ["set", String(seconds), label] };
+                         script: "ai-timer", args: ["set", String(seconds), label], autoRun: true };
         } else if (name === "kuro_open_container") {
             const container = String(args.name ?? "");
             if (validContainer(container))
@@ -390,7 +390,7 @@ PopupWindow {
             processActionQueue();
             return;
         }
-        if (action.readOnly === true) {
+        if (action.readOnly === true || action.autoRun === true) {
             actionQueue = actionQueue.slice(1);
             runActionScript(action);
             return;
@@ -809,7 +809,7 @@ PopupWindow {
                                         }
                                         Text {
                                             Layout.fillWidth: true
-                                            text: "Only the selected allowlisted script will run."
+                                            text: "Confirm to continue with this action."
                                             color: Theme.muted
                                             font.family: Theme.font
                                             font.pixelSize: 10
@@ -819,7 +819,7 @@ PopupWindow {
                                             Layout.fillWidth: true
                                             Item { Layout.fillWidth: true }
                                             TextButton { text: "Cancel"; onClicked: root.rejectAction() }
-                                            TextButton { text: "Run script"; primary: true; onClicked: root.approveAction() }
+                                            TextButton { text: "Confirm action"; primary: true; onClicked: root.approveAction() }
                                         }
                                     }
                                 }

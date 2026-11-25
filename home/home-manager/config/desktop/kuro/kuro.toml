@@ -23,7 +23,7 @@ scheme = "jellybeans"
 rounding = 0
 gaps_in = 4
 gaps_out = 8
-border_size = 2
+border_size = 3
 blur = false
 animations = true
 active_opacity = 1.0
@@ -64,6 +64,7 @@ wallpaper_dir = "~/Pictures/Wallpaper"
 wallpaper_picker = "qs -c shell ipc call stylepicker wallpaper"
 
 [hypr]
+layout = "dwindle"
 kb_layout = "us"
 kb_options = "altwin:swap_alt_win"   # swap Alt <-> Super
 follow_mouse = 1                      # focus follows cursor movement

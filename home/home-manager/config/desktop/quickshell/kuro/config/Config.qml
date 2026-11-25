@@ -8,6 +8,7 @@ import Quickshell.Io
 Singleton {
     id: root
     readonly property string home: Quickshell.env("HOME")
+    readonly property string nixConfigDir: home + "/.config/nixconfig"
 
     // ── Kuro: central settings ───────────────────────────────────────
     // Source of truth for colors, fonts and look. `kurogen` renders it to
@@ -36,6 +37,10 @@ Singleton {
     // Folder shown as a grid on the Wallpaper page.
     // Same as WALL_DIR in the wallset script.
     property string wallpaperDir: home + "/Pictures/Wallpaper"
+    readonly property string wallpaperThumbCache: home + "/.cache/quickshell/wallpaper-thumbnails"
+    readonly property string wallpaperThumbScript: home + "/.config/quickshell/shell/bin/wallpaper-thumbnails"
+    readonly property string wallpaperIndexScript: home + "/.config/quickshell/shell/bin/wallpaper-index"
+    readonly property string systemWindowDataScript: home + "/.config/quickshell/shell/bin/system-window-data.py"
 
     // Backend: called when a thumbnail is clicked. "$1" = image path.
     // Apply directly through the running awww daemon.

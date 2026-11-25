@@ -17,6 +17,26 @@ Singleton {
     property bool blurChangedForOverview: false
     property bool restoreBlurAfterEnable: false
 
+    // Build reusable indexes when window/toplevel data changes instead of
+    // filtering and scanning the complete lists from every preview delegate.
+    readonly property var clientsByWorkspace: {
+        const groups = Object.create(null);
+        for (const client of clients) {
+            const key = String(client.ws);
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(client);
+        }
+        return groups;
+    }
+    readonly property var toplevelsByAddress: {
+        const index = Object.create(null);
+        for (const toplevel of (Hyprland.toplevels?.values ?? [])) {
+            const address = normAddr(toplevel.address);
+            if (address) index[address] = toplevel.wayland ?? null;
+        }
+        return index;
+    }
+
     function toggle() { shown ? close() : open(); }
     function open() {
         if (shown) return;
@@ -46,7 +66,7 @@ Singleton {
     // "0x55d1a2b3c4d5" and "55d1a2b3c4d5" are treated as the same
     function normAddr(a) { return String(a ?? "").toLowerCase().replace(/^0x/, ""); }
 
-    function windowsOn(ws) { return clients.filter(c => c.ws === ws); }
+    function windowsOn(ws) { return clientsByWorkspace[String(ws)] ?? []; }
 
     function focusWindow(c) {
         Hyprland.dispatch("focuswindow address:0x" + normAddr(c.address));
@@ -74,11 +94,7 @@ Singleton {
 
     // Wayland toplevel for the preview (ScreencopyView). null if not found.
     function toplevelFor(address) {
-        const a = normAddr(address);
-        const list = Hyprland.toplevels?.values ?? [];
-        for (const t of list)
-            if (normAddr(t.address) === a) return t.wayland ?? null;
-        return null;
+        return toplevelsByAddress[normAddr(address)] ?? null;
     }
 
     Timer { id: refreshLater; interval: 300; onTriggered: root.refresh() }

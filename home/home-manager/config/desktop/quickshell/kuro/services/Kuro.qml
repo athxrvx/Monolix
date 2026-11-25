@@ -7,9 +7,9 @@ import qs.config
 
 // Owns the kuro.toml -> generated configs pipeline.
 //
-// kurogen renders ~/.cache/kuro/theme.json, ~/.config/hypr/kuro.lua and
-// ~/.config/kitty/kuro.conf. This service regenerates them when the TOML
-// changes, then reloads Hyprland and kitty.
+// kurogen renders the shell, Hyprland, kitty and Helix themes from kuro.toml.
+// This service regenerates them when the TOML changes, then reloads the live
+// desktop components.
 Singleton {
     id: root
 
@@ -82,7 +82,7 @@ Singleton {
     Process {
         id: reloadProc
         command: ["sh", "-c",
-            "hyprctl reload >/dev/null 2>&1; pkill -USR1 -x kitty >/dev/null 2>&1; emacsclient --no-wait --eval '(when (fboundp \\'kuro-reload-theme) (kuro-reload-theme))' >/dev/null 2>&1; true"]
+            "hyprctl reload >/dev/null 2>&1; pkill -USR1 -x kitty >/dev/null 2>&1; true"]
     }
 
     FileView {

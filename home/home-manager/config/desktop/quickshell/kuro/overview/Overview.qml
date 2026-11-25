@@ -42,18 +42,11 @@ Scope {
             property var dragging: null       // client currently being dragged
             property point dragPos: Qt.point(0, 0)
 
-            readonly property real aspect: mon.w / Math.max(1, mon.h)
             readonly property var windowList: OverviewState.windowsOn(selected)
-            readonly property real gap: 24
-            readonly property real railWidth: 190
-            readonly property int cols: Math.max(1, Math.min(3, Math.max(1, windowList.length),
-                Math.floor((width - railWidth - 112 + gap) / (420 + gap))))
-            readonly property int rows: Math.ceil(windowList.length / cols)
-            readonly property real tileW: Math.max(180, Math.min(
-                windowList.length === 1 ? 640 : 500,
-                (width - railWidth - 112 - (cols - 1) * gap) / cols))
-            readonly property real tileH: Math.max(100, Math.min(tileW / aspect,
-                (height - 150 - Math.max(0, rows - 1) * gap) / Math.max(1, rows)))
+            readonly property real railWidth: 270
+            // Keep the overview clear of the top panel and bottom dock.
+            readonly property real topInset: 30
+            readonly property real bottomInset: 48
 
             screen: modelData
             visible: OverviewState.shown
@@ -76,7 +69,7 @@ Scope {
             Rectangle {
                 id: body
                 anchors.fill: parent
-                color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.18)
+                color: "transparent"
                 focus: true
 
                 Keys.onPressed: event => {
@@ -90,79 +83,31 @@ Scope {
                     event.accepted = true;
                 }
 
-                // Click empty area = close
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: OverviewState.close()
+                Rectangle {
+                    id: backdrop
+                    x: 0
+                    y: win.topInset
+                    width: parent.width
+                    height: Math.max(0, parent.height - win.topInset - win.bottomInset)
+                    color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.18)
+
+                    // Click empty area = close
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: OverviewState.close()
+                    }
                 }
 
                 Rectangle {
                     id: railSurface
-                    x: 0
-                    y: 0
-                    width: win.railWidth + 58
-                    height: parent.height
+                    x: 8
+                    y: win.topInset + 8
+                    width: win.railWidth + 10
+                    height: Math.max(0, parent.height - win.topInset - win.bottomInset - 16)
                     color: Theme.bg
                     border.width: 1
                     border.color: Theme.border
                     z: 1
-                }
-
-                RowLayout {
-                    id: tabs
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.leftMargin: 30
-                    anchors.topMargin: 12
-                    spacing: 20
-                    z: 2
-
-                    Item {
-                        implicitWidth: workspaceTabLabel.implicitWidth
-                        implicitHeight: 24
-                        Text {
-                            id: workspaceTabLabel
-                            anchors.top: parent.top
-                            text: "Workspaces"
-                            color: Theme.text
-                            font.family: Theme.font
-                            font.pixelSize: 13
-                            font.bold: true
-                        }
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            height: 2
-                            color: Theme.accent
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {}
-                        }
-                    }
-
-                    Item {
-                        implicitWidth: applicationsTabLabel.implicitWidth
-                        implicitHeight: 24
-                        Text {
-                            id: applicationsTabLabel
-                            anchors.top: parent.top
-                            text: "Applications"
-                            color: Theme.subtext
-                            font.family: Theme.font
-                            font.pixelSize: 13
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                OverviewState.close();
-                                Launcher.toggle();
-                            }
-                        }
-                    }
                 }
 
                 ParallelAnimation {
@@ -173,12 +118,15 @@ Scope {
 
                 RowLayout {
                     id: overviewLayout
-                    anchors.fill: parent
-                    anchors.leftMargin: 34
-                    anchors.rightMargin: 34
-                    anchors.topMargin: 58
-                    anchors.bottomMargin: 24
-                    spacing: 30
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 18
+                    anchors.rightMargin: 18
+                    anchors.topMargin: win.topInset + 8
+                    anchors.bottomMargin: win.bottomInset + 8
+                    spacing: 12
                     z: 2
 
                     ColumnLayout {
@@ -204,7 +152,7 @@ Scope {
                                 Layout.minimumWidth: win.railWidth
                                 Layout.fillWidth: true
                                 Layout.maximumWidth: win.railWidth
-                                Layout.preferredHeight: 96
+                                Layout.preferredHeight: (win.railWidth - 20) * 9 / 16 + 10
                                 radius: Theme.radiusSmall
                                 color: chosen ? Theme.surface : "transparent"
                                 border.width: win.dragging !== null && win.hoveredWs === modelData ? 1 : 0
@@ -214,15 +162,18 @@ Scope {
                                 ColumnLayout {
                                     anchors.fill: parent
                                     anchors.margins: 5
-                                    spacing: 4
+                                    spacing: 0
 
                                     Rectangle {
                                         id: workspacePreview
                                         Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        Layout.minimumWidth: win.railWidth - 10
-                                        Layout.maximumWidth: win.railWidth - 10
-                                        Layout.preferredWidth: win.railWidth - 10
+                                        Layout.fillHeight: false
+                                        Layout.minimumWidth: win.railWidth - 20
+                                        Layout.maximumWidth: win.railWidth - 20
+                                        Layout.preferredWidth: win.railWidth - 20
+                                        Layout.minimumHeight: (win.railWidth - 20) * 9 / 16
+                                        Layout.maximumHeight: (win.railWidth - 20) * 9 / 16
+                                        Layout.preferredHeight: (win.railWidth - 20) * 9 / 16
                                         color: Theme.bgAlt
                                         border.width: 1
                                         border.color: workspaceEntry.current ? Theme.accent : Theme.border
@@ -253,23 +204,6 @@ Scope {
                                         }
                                     }
 
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text {
-                                            text: "Workspace " + workspaceEntry.modelData
-                                            color: workspaceEntry.chosen ? Theme.text : Theme.subtext
-                                            font.family: Theme.font
-                                            font.pixelSize: 10
-                                            elide: Text.ElideRight
-                                            Layout.fillWidth: true
-                                        }
-                                        Text {
-                                            text: String(workspaceEntry.windowCount)
-                                            color: Theme.muted
-                                            font.family: Theme.font
-                                            font.pixelSize: 10
-                                        }
-                                    }
                                 }
 
                                 HoverHandler {
@@ -287,120 +221,66 @@ Scope {
                             }
                         }
 
-                        Item { Layout.fillHeight: true }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: "↑ ↓ select   ↵ switch"
-                            color: Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 10
-                            wrapMode: Text.Wrap
-                        }
                     }
 
-                    ColumnLayout {
+                    Item {
                         id: mainContent
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        spacing: 24
+                        readonly property real previewScale: Math.min(
+                            (width - 24) / Math.max(1, win.mon.w),
+                            (height - 24) / Math.max(1, win.mon.h))
+                        readonly property real previewWidth: win.mon.w * previewScale
+                        readonly property real previewHeight: win.mon.h * previewScale
 
-                        RowLayout {
-                            Layout.fillWidth: true
+                        Repeater {
+                            id: windows
+                            model: win.windowList
 
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-                                Text {
-                                    text: "WORKSPACE " + win.selected
-                                    color: Theme.text
-                                    font.family: Theme.font
-                                    font.pixelSize: 20
-                                    font.bold: true
+                            WindowThumb {
+                                required property var modelData
+                                client: modelData
+                                x: (mainContent.width - mainContent.previewWidth) / 2
+                                    + (modelData.x - win.mon.x) * mainContent.previewScale
+                                y: (mainContent.height - mainContent.previewHeight) / 2
+                                    + (modelData.y - win.mon.y) * mainContent.previewScale
+                                width: modelData.w * mainContent.previewScale
+                                height: modelData.h * mainContent.previewScale
+                                overlay: body
+                                onDragStarted: (c, p) => {
+                                    win.dragging = c;
+                                    win.dragPos = p;
                                 }
-                                Text {
-                                    text: win.windowList.length === 1 ? "1 open window" : win.windowList.length + " open windows"
-                                    color: Theme.muted
-                                    font.family: Theme.font
-                                    font.pixelSize: 12
+                                onDragMoved: p => win.dragPos = p
+                                onDragEnded: p => {
+                                    win.dragPos = p;
+                                    const targetWs = win.hoveredWs;
+                                    const client = win.dragging;
+                                    win.dragging = null;
+                                    if (client && targetWs > 0)
+                                        OverviewState.moveWindow(client, targetWs);
                                 }
                             }
+                        }
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            visible: win.windowList.length === 0
+                            spacing: 10
                             Text {
-                                text: "DRAG WINDOWS TO MOVE"
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "+"
                                 color: Theme.muted
                                 font.family: Theme.font
-                                font.pixelSize: 10
-                                font.letterSpacing: 1
+                                font.pixelSize: 42
                             }
-                        }
-
-                        Item {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-
-                            Grid {
-                                id: grid
-                                anchors.centerIn: parent
-                                columns: win.cols
-                                spacing: win.gap
-                                opacity: 1
-                                width: columns * win.tileW + Math.max(0, columns - 1) * spacing
-
-                                Repeater {
-                                    id: windows
-                                    model: win.windowList
-
-                                    WindowThumb {
-                                        required property var modelData
-                                        client: modelData
-                                        width: win.tileW
-                                        height: win.tileH
-                                        overlay: body
-                                        onDragStarted: (c, p) => {
-                                            win.dragging = c;
-                                            win.dragPos = p;
-                                        }
-                                        onDragMoved: p => win.dragPos = p
-                                        onDragEnded: p => {
-                                            win.dragPos = p;
-                                            const targetWs = win.hoveredWs;
-                                            const client = win.dragging;
-                                            win.dragging = null;
-                                            if (client && targetWs > 0)
-                                                OverviewState.moveWindow(client, targetWs);
-                                        }
-                                    }
-                                }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: "No open windows"
+                                color: Theme.subtext
+                                font.family: Theme.font
+                                font.pixelSize: 14
                             }
-
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                visible: win.windowList.length === 0
-                                spacing: 10
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "+"
-                                    color: Theme.muted
-                                    font.family: Theme.font
-                                    font.pixelSize: 42
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "No open windows"
-                                    color: Theme.subtext
-                                    font.family: Theme.font
-                                    font.pixelSize: 14
-                                }
-                            }
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: "click a window to focus  ·  middle-click to close  ·  esc to dismiss"
-                            color: Theme.muted
-                            font.family: Theme.font
-                            font.pixelSize: 11
-                            horizontalAlignment: Text.AlignHCenter
                         }
                     }
                 }

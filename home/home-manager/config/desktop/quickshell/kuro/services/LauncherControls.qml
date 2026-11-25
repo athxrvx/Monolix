@@ -69,6 +69,14 @@ Singleton {
         const a = Audio;
         const items = [
             {
+                title: "Layout",
+                sub: "Choose the active workspace window layout",
+                glyph: Icons.overview,
+                keys: "layout tiling dwindle scrolling niri columns",
+                hint: "open",
+                run: { type: "enterSection", id: "control-layout" }
+            },
+            {
                 title: "System profile",
                 sub: "Open the live CPU, memory, disk, Wi-Fi and GPU monitor",
                 glyph: Icons.cpu,
@@ -118,6 +126,24 @@ Singleton {
             }
         ];
         return items;
+    }
+
+    function layoutItems() {
+        LayoutMode.refresh();
+        const descriptions = {
+            dwindle: "Split windows into a binary tiling tree",
+            scrolling: "Niri-style horizontal tape of window columns"
+        };
+        return LayoutMode.modes.map(mode => ({
+            title: mode.charAt(0).toUpperCase() + mode.slice(1),
+            sub: descriptions[mode],
+            glyph: Icons.overview,
+            keys: "layout tiling " + mode + (mode === "scrolling" ? " niri columns horizontal" : ""),
+            hint: LayoutMode.current === mode ? "active" : "set",
+            active: LayoutMode.current === mode,
+            keepOpen: true,
+            run: { type: "callback", fn: () => LayoutMode.set(mode) }
+        }));
     }
 
     // ── Profile / system information ─────────────────────────────────

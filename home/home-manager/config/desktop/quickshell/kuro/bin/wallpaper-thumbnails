@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -u
+
+cache_dir=${1:?thumbnail cache directory required}
+wallpaper_dir=${2:?wallpaper directory required}
+mkdir -p "$cache_dir" || exit 1
+
+find -L "$wallpaper_dir" -maxdepth 2 -type f \
+    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' \) \
+    -print0 2>/dev/null |
+while IFS= read -r -d '' source; do
+    signature=$(stat -Lc '%s:%y:%i' -- "$source") || continue
+    hash=$(printf '%s\0%s' "$source" "$signature" | sha256sum | cut -c1-32)
+    target="$cache_dir/$hash.jpg"
+    if [[ ! -s "$target" || "$source" -nt "$target" ]]; then
+        if ! magick "${source}[0]" -auto-orient -thumbnail '480x320^' \
+            -gravity center -extent 480x320 -strip -quality 82 "$target" 2>/dev/null; then
+            rm -f "$target"
+            continue
+        fi
+    fi
+    printf '%s\t%s\n' "$source" "$target"
+done

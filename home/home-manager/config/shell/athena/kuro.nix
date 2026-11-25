@@ -28,7 +28,6 @@ let
         pkgs.coreutils
         pkgs.systemd
         pkgs.fzf
-        pkgs.nano
       ]}
     '';
     meta = {

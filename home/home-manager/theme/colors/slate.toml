@@ -1,0 +1,50 @@
+name = "Slate"
+mode = "dark"
+
+# Jellybeans-like layered slate surfaces with a single cool steel-blue accent.
+# The ANSI colors below deliberately retain Jellybeans' colorful terminal
+# palette while the scheme's semantic UI colors stay neutral.
+accent = "#91a9b8"
+selection = "#30383e"
+muted = "#92989c"
+
+background = "#171a1d"
+dark_background = "#111416"
+darker_background = "#0c0f11"
+lighter_background = "#252a2e"
+
+foreground = "#d7d9da"
+dark_foreground = "#92989c"
+light_foreground = "#e0e2e3"
+bright_foreground = "#f4f5f5"
+
+# Jellybeans ANSI palette: kept colorful for terminal applications.
+red = "#e27373"
+yellow = "#ffba7b"
+orange = "#ffa560"
+green = "#94b979"
+cyan = "#00988e"
+blue = "#97bedc"
+magenta = "#e1c0fa"
+brown = "#8a694c"
+
+bright_red = "#ffa1a1"
+bright_yellow = "#ffdca0"
+bright_green = "#bddeab"
+bright_cyan = "#1ab2a8"
+bright_blue = "#b1d8f6"
+bright_magenta = "#fbdaff"
+
+cursor = "#91a9b8"
+cursor_text = "#171a1d"
+url = "#91a9b8"
+inactive_border = "#92989c88"
+active_tab_background = "#30383e"
+tab_active_foreground = "#f4f5f5"
+
+# Complete Kuro semantic color contract.
+accent_text = "#171a1d"
+selection_foreground = "#d7d9da"
+active_border_color = "#91a9b8"
+tab_inactive_background = "#252a2e"
+tab_inactive_foreground = "#d7d9da"

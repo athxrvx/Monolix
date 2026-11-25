@@ -16,14 +16,28 @@ Singleton {
     property var images: []
     property string applying: ""
     property bool loading: false
+    property bool refreshPending: false
+    property bool thumbnailLoading: false
+    property bool thumbnailRefreshPending: false
     property string error: ""
+    property var thumbnails: ({})
+    property var imageSignatures: ({})
+    property double lastRefresh: 0
 
     readonly property bool hasPicker: Config.wallpaperPicker !== ""
 
-    function refresh() {
-        if (listProc.running) return;
+    function refresh(force = false) {
+        if (listProc.running) {
+            if (force) root.refreshPending = true;
+            return;
+        }
+        if (!force && Date.now() - lastRefresh < 60000) return;
         loading = true;
         listProc.running = true;
+    }
+
+    function thumbnail(path) {
+        return thumbnails[path] ?? (thumbnailLoading ? "" : path);
     }
 
     function set(path) {
@@ -43,20 +57,51 @@ Singleton {
 
     function fileName(path) { return path.split("/").pop(); }
 
-    readonly property string script: [
-        'echo "$(awww query 2>/dev/null | grep -m1 -oE "image: .*" | sed "s/^image: //")"',
-        'find -L "$1" -maxdepth 2 -type f \\( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o -iname "*.gif" \\) 2>/dev/null | sort'
-    ].join("\n")
-
     Process {
         id: listProc
-        command: ["sh", "-c", root.script, "sh", Config.wallpaperDir]
+        command: [Config.wallpaperIndexScript, Config.wallpaperDir]
         stdout: StdioCollector {
             onStreamFinished: {
-                const l = text.split("\n");
-                root.current = l[0] ?? "";
-                root.images = l.slice(1).filter(p => p !== "");
+                let snapshot;
+                try { snapshot = JSON.parse(text); }
+                catch (e) {
+                    root.error = "Could not read wallpaper index: " + e;
+                    root.loading = false;
+                    return;
+                }
+
+                root.current = snapshot.current ?? "";
+                root.error = "";
+                const nextImages = [];
+                const nextSignatures = {};
+                const changedImages = [];
+                for (const item of (snapshot.items ?? [])) {
+                    const path = item.path;
+                    const signature = item.signature;
+                    nextImages.push(path);
+                    nextSignatures[path] = signature;
+                    if (root.imageSignatures[path] !== signature || root.thumbnails[path] === undefined)
+                        changedImages.push(path);
+                }
+
+                const imagesChanged = nextImages.length !== root.images.length
+                    || nextImages.some((path, index) => path !== root.images[index]);
+                if (imagesChanged) root.images = nextImages;
+                root.imageSignatures = nextSignatures;
+                root.lastRefresh = Date.now();
                 root.loading = false;
+                const retained = {};
+                for (const path in root.thumbnails) {
+                    if (nextSignatures[path] !== undefined) retained[path] = root.thumbnails[path];
+                }
+                root.thumbnails = retained;
+                if (changedImages.length > 0) {
+                    root.thumbnailLoading = true;
+                    if (thumbProc.running) root.thumbnailRefreshPending = true;
+                    else thumbProc.running = true;
+                } else if (!thumbProc.running) {
+                    root.thumbnailLoading = false;
+                }
             }
         }
         stderr: StdioCollector {
@@ -66,6 +111,34 @@ Singleton {
         onExited: (code, status) => {
             if (code !== 0 && root.error === "") root.error = "Failed to read folder (code " + code + ")";
             listTimeout.restart();
+            if (root.refreshPending) {
+                root.refreshPending = false;
+                root.refresh(true);
+            }
+        }
+    }
+
+    Process {
+        id: thumbProc
+        command: ["nice", "-n", "10", Config.wallpaperThumbScript, Config.wallpaperThumbCache, Config.wallpaperDir]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: line => {
+                const split = line.indexOf("\t");
+                if (split <= 0) return;
+                const map = Object.assign({}, root.thumbnails);
+                map[line.slice(0, split)] = line.slice(split + 1);
+                root.thumbnails = map;
+            }
+        }
+        onExited: (code, status) => {
+            if (code === 0 && root.thumbnailRefreshPending && root.images.length > 0) {
+                root.thumbnailRefreshPending = false;
+                thumbProc.running = true;
+                return;
+            }
+            root.thumbnailLoading = false;
+            root.thumbnailRefreshPending = false;
         }
     }
 

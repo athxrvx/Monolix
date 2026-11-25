@@ -33,6 +33,13 @@ return function()
         size   = { 900, 620 },
     })
 
+    hl.window_rule({
+        name   = "scratch",
+        match  = { class = "^scratch$" },
+        float  = true,
+        center = true,
+        size   = { 1300, 900 },
+    })
     -- Flea is disabled; its popup rule is kept here for reference.
     -- hl.window_rule({
     --     name   = "flea-file-manager-popup",

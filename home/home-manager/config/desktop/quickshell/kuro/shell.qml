@@ -94,6 +94,7 @@ ShellRoot {
     IpcHandler {
         target: "monitor"
         function open(): void { systemMonitor.openWindow() }
+        function page(name: string): void { systemMonitor.openPage(name) }
         function toggle(): void { systemMonitor.toggle() }
         function close(): void { systemMonitor.visible = false }
     }

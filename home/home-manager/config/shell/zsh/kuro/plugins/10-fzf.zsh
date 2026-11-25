@@ -48,6 +48,6 @@ function fopen() {
   local selected
   selected="$(fzf --query="$*" --multi --preview='([[ -d {} ]] && ls -la --color=always {} || (command -v bat >/dev/null && bat --color=always --style=numbers --line-range :120 {} || sed -n "1,120p" {})) 2>/dev/null')" || return
   [[ -n "$selected" ]] || return 0
-  local editor="${EDITOR:-vi}"
+  local editor="${EDITOR:-hx}"
   ${=editor} "${(@f)selected}"
 }

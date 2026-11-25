@@ -1,0 +1,48 @@
+name = "Automata"
+mode = "dark"
+
+# Inspired by the stark black-and-white menus, pale porcelain text, and
+# restrained gold accents of NieR: Automata.
+accent = "#c49a52"
+selection = "#51432d"
+muted = "#77736b"
+
+background = "#111111"
+dark_background = "#080808"
+darker_background = "#050505"
+lighter_background = "#242321"
+
+foreground = "#dedbd2"
+dark_foreground = "#77736b"
+light_foreground = "#eeeae0"
+bright_foreground = "#fffdf5"
+
+red = "#b85b54"
+yellow = "#c49a52"
+orange = "#bd8050"
+green = "#84917a"
+cyan = "#779395"
+blue = "#8399aa"
+magenta = "#a18b9b"
+brown = "#806a4c"
+
+bright_red = "#dc7569"
+bright_yellow = "#e3bd76"
+bright_green = "#a8b49b"
+bright_cyan = "#9bb9b8"
+bright_blue = "#a8c0d0"
+bright_magenta = "#c1aebe"
+
+cursor = "#c49a52"
+cursor_text = "#111111"
+url = "#a8c0d0"
+inactive_border = "#77736b88"
+active_tab_background = "#51432d"
+tab_active_foreground = "#fffdf5"
+
+# Complete Kuro semantic color contract.
+accent_text = "#111111"
+selection_foreground = "#dedbd2"
+active_border_color = "#c49a52"
+tab_inactive_background = "#242321"
+tab_inactive_foreground = "#dedbd2"

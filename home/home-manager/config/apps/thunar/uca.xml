@@ -12,6 +12,7 @@
   <action>
     <icon>preferences-desktop-wallpaper</icon>
     <name>Set as Wallpaper</name>
+    <submenu>Wallpapers</submenu>
     <unique-id>1763761200000000-2</unique-id>
     <command>awww img %f --transition-type grow</command>
     <description>Set this image as the desktop wallpaper</description>
@@ -22,7 +23,7 @@
     <icon>edit-copy</icon>
     <name>Copy Path</name>
     <unique-id>1763761200000000-3</unique-id>
-    <command>echo -n %f | wl-copy</command>
+    <command>thunar-file copy-path %F</command>
     <description>Copy the selected path to the clipboard</description>
     <patterns>*</patterns>
     <audio-files/>
@@ -34,11 +35,167 @@
   </action>
   <action>
     <icon>text-editor</icon>
-    <name>Open in Neovim</name>
+    <name>Open in Helix</name>
     <unique-id>1763761200000000-4</unique-id>
-    <command>kitty -e nvim %f</command>
-    <description>Open this text or code file in Neovim</description>
+    <command>kitty -e hx %f</command>
+    <description>Open this text or code file in Helix</description>
     <patterns>*</patterns>
     <text-files/>
+  </action>
+  <action>
+    <icon>edit-copy</icon>
+    <name>Copy Filename</name>
+    <submenu>File Tools</submenu>
+    <unique-id>1763761200000000-13</unique-id>
+    <command>thunar-file copy-name %F</command>
+    <description>Copy the selected file names</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <audio-files/>
+    <image-files/>
+    <other-files/>
+    <text-files/>
+    <video-files/>
+  </action>
+  <action>
+    <icon>security-high</icon>
+    <name>Calculate SHA-256</name>
+    <submenu>File Tools</submenu>
+    <unique-id>1763761200000000-14</unique-id>
+    <command>thunar-file checksum %F</command>
+    <description>Show SHA-256 checksums for the selection</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <audio-files/>
+    <image-files/>
+    <other-files/>
+    <text-files/>
+    <video-files/>
+  </action>
+  <action>
+    <icon>package-x-generic</icon>
+    <name>Create Archive…</name>
+    <submenu>File Tools</submenu>
+    <unique-id>1763761200000000-15</unique-id>
+    <command>thunar-file archive %F</command>
+    <description>Create a ZIP, TAR.GZ, or TAR.XZ archive beside the selection</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <audio-files/>
+    <image-files/>
+    <other-files/>
+    <text-files/>
+    <video-files/>
+    <directories/>
+  </action>
+  <action>
+    <icon>package-x-generic</icon>
+    <name>Extract Archive Here</name>
+    <submenu>File Tools</submenu>
+    <unique-id>1763761200000000-16</unique-id>
+    <command>thunar-file extract %F</command>
+    <description>Extract supported archives into a new folder beside each archive</description>
+    <range>*</range>
+    <patterns>*.zip;*.tar;*.tar.gz;*.tgz;*.tar.xz</patterns>
+    <other-files/>
+  </action>
+  <action>
+    <icon>object-rotate-left</icon>
+    <name>Rotate Left 90° (copy)</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-5</unique-id>
+    <command>thunar-image rotate-left %F</command>
+    <description>Create rotated copies of the selected images</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>object-rotate-right</icon>
+    <name>Rotate Right 90° (copy)</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-6</unique-id>
+    <command>thunar-image rotate-right %F</command>
+    <description>Create rotated copies of the selected images</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>object-flip-horizontal</icon>
+    <name>Flip Horizontally (copy)</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-7</unique-id>
+    <command>thunar-image flip-horizontal %F</command>
+    <description>Create horizontally flipped copies of the selected images</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>object-flip-vertical</icon>
+    <name>Flip Vertically (copy)</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-8</unique-id>
+    <command>thunar-image flip-vertical %F</command>
+    <description>Create vertically flipped copies of the selected images</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>image-resize</icon>
+    <name>Resize…</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-9</unique-id>
+    <command>thunar-image resize %F</command>
+    <description>Resize selected images to a percentage or dimensions, saving copies</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>image-x-generic</icon>
+    <name>Convert Format…</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-10</unique-id>
+    <command>thunar-image convert %F</command>
+    <description>Convert selected images to PNG, JPEG, or WebP copies</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>document-properties</icon>
+    <name>Image Details</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-11</unique-id>
+    <command>thunar-image details %F</command>
+    <description>Show format, dimensions, and file size</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>edit-clear</icon>
+    <name>Remove Metadata (copy)</name>
+    <submenu>Images</submenu>
+    <unique-id>1763761200000000-12</unique-id>
+    <command>thunar-image strip-metadata %F</command>
+    <description>Create copies without embedded metadata</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
+  </action>
+  <action>
+    <icon>folder-pictures</icon>
+    <name>Add to Wallpapers (move)</name>
+    <submenu>Wallpapers</submenu>
+    <unique-id>1763761200000000-17</unique-id>
+    <command>thunar-image add-wallpaper %F</command>
+    <description>Move selected images to the wallpaper directory configured in Kuro</description>
+    <range>*</range>
+    <patterns>*</patterns>
+    <image-files/>
   </action>
 </actions>

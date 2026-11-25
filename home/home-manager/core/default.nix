@@ -9,5 +9,6 @@
     ../config/shell/athena/dynashell.nix
     ../config/terminal/tmux/tmux.nix
     ../config/desktop/qute/qute.nix
+    ../config/desktop/xdg/xdg.nix
   ];
 }

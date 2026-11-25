@@ -1,0 +1,92 @@
+/* Kuro's generated palette is shared with userChrome.css. */
+@import url("file:///home/atharva/.cache/kuro/firefox-theme.css");
+
+/* Preserve the existing SimpleFox scrollbar and private browsing tweaks. */
+:root {
+  scrollbar-width: none !important;
+}
+
+@-moz-document url(about:privatebrowsing) {
+  :root {
+    scrollbar-width: none !important;
+  }
+}
+
+/* Theme Firefox Home and New Tab with the live Kuro palette. */
+@-moz-document url-prefix("about:home"), url-prefix("about:newtab") {
+  :root,
+  .activity-stream {
+    color-scheme: dark !important;
+    --newtab-theme-color-scheme: dark !important;
+    --newtab-background-color: var(--kuro-firefox-bg, #0d0d0d) !important;
+    --newtab-background-color-secondary: var(--kuro-firefox-surface, #151515) !important;
+    --newtab-text-primary-color: var(--kuro-firefox-fg, #dedede) !important;
+    --newtab-text-secondary-color: var(--kuro-firefox-fg-muted, #888888) !important;
+    --newtab-text-secondary-text: var(--kuro-firefox-fg-muted, #888888) !important;
+    --newtab-background-card: color-mix(in srgb, var(--kuro-firefox-surface, #151515) 92%, transparent) !important;
+    --newtab-primary-action-background: var(--kuro-firefox-accent, #8a694c) !important;
+    --newtab-primary-action-background-pocket: var(--kuro-firefox-accent, #8a694c) !important;
+    --newtab-primary-element-text-color: var(--kuro-firefox-fg-bright, #ffffff) !important;
+    --newtab-element-hover-color: var(--kuro-firefox-surface-hover, #303030) !important;
+    --newtab-element-active-color: var(--kuro-firefox-surface-raised, #8a694c) !important;
+    --newtab-border-color: var(--kuro-firefox-border, #383838) !important;
+    --newtab-wordmark-color: var(--kuro-firefox-accent, #8a694c) !important;
+    --newtab-button-background: var(--kuro-firefox-surface, #151515) !important;
+    --newtab-button-hover-background: var(--kuro-firefox-surface-hover, #303030) !important;
+    --newtab-button-active-background: var(--kuro-firefox-surface-raised, #8a694c) !important;
+    --newtab-button-text: var(--kuro-firefox-fg, #dedede) !important;
+    --panel-list-background-color: var(--kuro-firefox-surface, #151515) !important;
+    --panel-list-color: var(--kuro-firefox-fg, #dedede) !important;
+  }
+
+  body.activity-stream,
+  .activity-stream {
+    color: var(--kuro-firefox-fg, #dedede) !important;
+    background-color: var(--kuro-firefox-bg, #0d0d0d) !important;
+  }
+
+  .activity-stream *,
+  panel-list,
+  panel-list * {
+    border-radius: 0 !important;
+  }
+
+  .search-handoff-button,
+  .search-inner-wrapper input {
+    color: var(--kuro-firefox-fg, #dedede) !important;
+    background-color: var(--kuro-firefox-surface, #151515) !important;
+    border: 1px solid var(--kuro-firefox-border, #383838) !important;
+    box-shadow: none !important;
+  }
+
+  .search-handoff-button:hover,
+  .search-inner-wrapper input:hover {
+    background-color: var(--kuro-firefox-surface-hover, #303030) !important;
+  }
+
+  .search-inner-wrapper input:focus,
+  .search-inner-wrapper input:focus-visible {
+    border-color: var(--kuro-firefox-accent, #8a694c) !important;
+    outline: 1px solid var(--kuro-firefox-accent, #8a694c) !important;
+  }
+
+  .top-site-outer .tile,
+  .card-outer,
+  .ds-card {
+    color: var(--kuro-firefox-fg, #dedede) !important;
+    border: 1px solid var(--kuro-firefox-border, #383838) !important;
+    box-shadow: none !important;
+  }
+
+  .top-site-outer .tile:hover,
+  .card-outer:hover,
+  .ds-card:hover {
+    border-color: var(--kuro-firefox-accent, #8a694c) !important;
+  }
+
+  a,
+  .section-title,
+  .top-site-outer .title {
+    color: var(--kuro-firefox-fg, #dedede) !important;
+  }
+}

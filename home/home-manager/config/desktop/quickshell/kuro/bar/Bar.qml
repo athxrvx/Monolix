@@ -15,6 +15,7 @@ Scope {
 
     readonly property var lay: BarState.layout
     readonly property var activeModules: [...(lay.left ?? []), ...(lay.center ?? []), ...(lay.right ?? [])]
+    property int refreshPhase: 0
 
     // Refresh only services represented in the active layout. This keeps a
     // minimal bar from spawning nmcli/bluez/audio queries every few seconds.
@@ -22,21 +23,26 @@ Scope {
         return activeModules.some(spec => String(spec).split(":")[0] === name);
     }
 
-    // Light polling for indicators
+    // Spread indicator refreshes across the interval to avoid launching every
+    // status command at once. Each group still refreshes about every 3 seconds.
     Timer {
-        interval: 3000
+        interval: 750
         repeat: true
         running: BarState.shown
         triggeredOnStart: true
         onTriggered: {
-            if (root.hasModule("volume") || root.hasModule("mic")) Audio.refresh();
-            if (root.hasModule("network")) Network.refresh();
-            if (root.hasModule("bluetooth")) Bluetooth.refresh();
-            if (root.hasModule("battery")) Battery.refresh();
-            if (root.hasModule("brightness")) Brightness.refresh();
-            if (root.hasModule("notification")) Notifications.refresh();
-            if (root.hasModule("profile")) PowerProfile.refresh();
-            if (root.hasModule("memory") || root.hasModule("cpu")) SystemStats.refresh();
+            const phase = root.refreshPhase;
+            root.refreshPhase = (phase + 1) % 4;
+            if (phase === 0) {
+                if (root.hasModule("volume") || root.hasModule("mic")) Audio.refresh();
+                if (root.hasModule("memory") || root.hasModule("cpu")) SystemStats.refresh();
+            } else if (phase === 1) {
+                if (root.hasModule("network")) Network.refresh();
+                if (root.hasModule("battery")) Battery.refresh();
+            } else if (phase === 2) {
+                if (root.hasModule("brightness")) Brightness.refresh();
+                if (root.hasModule("notification")) Notifications.refresh();
+            } else if (root.hasModule("profile")) PowerProfile.refresh();
         }
     }
 

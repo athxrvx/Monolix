@@ -5,6 +5,7 @@ Source of truth : ~/.config/kuro/kuro.toml
 Outputs         : ~/.cache/kuro/theme.json       (Quickshell)
                   ~/.config/hypr/kuro.lua        (Hyprland)
                   ~/.config/kitty/kuro.conf      (kitty)
+                  ~/.config/helix/themes/kuro.toml (Helix)
 
 Usage:
     kurogen                       regenerate everything
@@ -25,7 +26,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -42,7 +42,7 @@ FLEA_SHELL = FLEA_THEME_DIR / "shell.toml"
 FLEA_FONT_FAMILY = FLEA_THEME_DIR / "font-family"
 HYPR_LUA = HOME / ".config/hypr/kuro.lua"
 KITTY_CONF = HOME / ".config/kitty/kuro.conf"
-EMACS_THEME = HOME / ".cache/kuro/kuro-theme.el"
+HELIX_THEME = HOME / ".config/helix/themes/kuro.toml"
 
 DEFAULTS = {
     "colors": {
@@ -57,6 +57,15 @@ DEFAULTS = {
         "hot": "#e27373",
         "accent": "#8a694c",
         "accent_text": "#dedede",
+        "red": "#e27373",
+        "yellow": "#ffba7b",
+        "orange": "#ffa560",
+        "green": "#94b979",
+        "cyan": "#00988e",
+        "blue": "#97bedc",
+        "magenta": "#e1c0fa",
+        "brown": "#8a694c",
+        "muted": "#888888",
         "cursor": "#ffa560",
         "cursor_text": "#0d0d0d",
         "selection_background": "#fad07a",
@@ -106,6 +115,7 @@ DEFAULTS = {
         "wallpaper_picker": "quickshell -c hyprquickpaper",
     },
     "hypr": {
+        "layout": "dwindle",
         "kb_layout": "us",
         "kb_options": "altwin:swap_alt_win",
         "follow_mouse": 1,
@@ -150,10 +160,11 @@ def list_themes() -> list[dict]:
             except (OSError, tomllib.TOMLDecodeError):
                 pass
             try:
-                palette = theme_colors(path.stem).get("palette", DEFAULTS["colors"]["palette"])
+                colors = theme_colors(path.stem)
             except (KuroError, OSError, tomllib.TOMLDecodeError):
-                palette = DEFAULTS["colors"]["palette"]
-            found.append({"id": path.stem, "name": name, "palette": palette})
+                colors = DEFAULTS["colors"]
+            palette = colors.get("palette", DEFAULTS["colors"]["palette"])
+            found.append({"id": path.stem, "name": name, "palette": palette[:16]})
     return found
 
 
@@ -256,6 +267,9 @@ def resolve_theme(cfg: dict, raw: dict) -> None:
     cfg["scheme"] = scheme or "custom"
     cfg["schemes"] = list_themes()
 
+    if cfg["hypr"].get("layout") not in ("dwindle", "scrolling"):
+        raise KuroError("hypr.layout must be 'dwindle' or 'scrolling'")
+
 
 def bootstrap_defaults() -> bool:
     """Copy bundled first-run defaults into ~/.config/kuro without overwrites.
@@ -357,6 +371,9 @@ def toml_value(value) -> str:
         return json.dumps(value)
     if isinstance(value, list):
         return "[" + ", ".join(toml_value(v) for v in value) + "]"
+    if isinstance(value, dict):
+        entries = (f"{json.dumps(key)} = {toml_value(item)}" for key, item in value.items())
+        return "{ " + ", ".join(entries) + " }"
     raise KuroError(f"cannot serialise {value!r} to TOML")
 
 
@@ -430,6 +447,72 @@ def render_theme_json(cfg: dict) -> str:
         },
     }
     return json.dumps(data, indent=2) + "\n"
+
+
+def render_helix_theme(cfg: dict) -> str:
+    """Render Helix's custom theme from the currently selected Kuro colors."""
+    c = cfg["colors"]
+    p = c["palette"]
+    groups = {
+        "ui.background": {"fg": c["ink"], "bg": c["base"]},
+        "ui.text": {"fg": c["ink"]},
+        "ui.text.focus": {"fg": c["ink"], "modifiers": ["bold"]},
+        "ui.text.inactive": {"fg": p[8]},
+        "ui.virtual": {"fg": p[8]},
+        "ui.virtual.indent-guide": {"fg": p[8]},
+        "ui.cursor": {"fg": c["cursor_text"], "bg": c["cursor"]},
+        "ui.cursor.primary": {"fg": c["cursor_text"], "bg": c["cursor"]},
+        "ui.cursor.match": {"fg": c["accent_text"], "bg": c["accent"], "modifiers": ["bold"]},
+        "ui.cursorline.primary": {"bg": p[0]},
+        "ui.selection": {"fg": c["selection_foreground"], "bg": c["selection_background"]},
+        "ui.selection.primary": {"fg": c["selection_foreground"], "bg": c["selection_background"]},
+        "ui.linenr": {"fg": p[8]},
+        "ui.linenr.selected": {"fg": c["accent"], "modifiers": ["bold"]},
+        "ui.statusline": {"fg": c["ink"], "bg": p[0]},
+        "ui.statusline.inactive": {"fg": p[8], "bg": c["base"]},
+        "ui.statusline.normal": {"fg": c["accent_text"], "bg": c["accent"], "modifiers": ["bold"]},
+        "ui.statusline.insert": {"fg": c["cursor_text"], "bg": p[2], "modifiers": ["bold"]},
+        "ui.statusline.select": {"fg": c["cursor_text"], "bg": p[4], "modifiers": ["bold"]},
+        "ui.bufferline": {"fg": p[8], "bg": c["base"]},
+        "ui.bufferline.active": {"fg": c["accent_text"], "bg": c["accent"], "modifiers": ["bold"]},
+        "ui.popup": {"fg": c["ink"], "bg": p[0]},
+        "ui.window": {"fg": p[8], "bg": c["base"]},
+        "ui.help": {"fg": c["ink"], "bg": p[0]},
+        "ui.menu": {"fg": c["ink"], "bg": p[0]},
+        "ui.menu.selected": {"fg": c["accent_text"], "bg": c["accent"], "modifiers": ["bold"]},
+        "ui.highlight": {"fg": c["cursor_text"], "bg": c["cursor"]},
+        "warning": {"fg": p[3]},
+        "error": {"fg": c["hot"]},
+        "info": {"fg": p[4]},
+        "hint": {"fg": p[6]},
+        "diagnostic.error": {"underline": {"color": c["hot"], "style": "curl"}},
+        "diagnostic.warning": {"underline": {"color": p[3], "style": "curl"}},
+        "diagnostic.info": {"underline": {"color": p[4], "style": "curl"}},
+        "diagnostic.hint": {"underline": {"color": p[6], "style": "curl"}},
+        "attribute": {"fg": p[5]},
+        "comment": {"fg": p[8], "modifiers": ["italic"]},
+        "constant": {"fg": p[3]},
+        "constant.numeric": {"fg": p[3]},
+        "constructor": {"fg": p[5]},
+        "function": {"fg": p[4]},
+        "function.method": {"fg": p[4]},
+        "keyword": {"fg": c["accent"], "modifiers": ["bold"]},
+        "namespace": {"fg": p[4]},
+        "operator": {"fg": p[8]},
+        "punctuation": {"fg": p[8]},
+        "string": {"fg": p[2]},
+        "tag": {"fg": p[1]},
+        "type": {"fg": p[6]},
+        "variable": {"fg": c["ink"]},
+        "variable.parameter": {"fg": p[3]},
+        "diff.plus": {"fg": p[2]},
+        "diff.minus": {"fg": c["hot"]},
+        "diff.delta": {"fg": p[3]},
+    }
+    lines = ["# Generated by kurogen from the active Kuro palette."]
+    for name, style in groups.items():
+        lines.append(f"{json.dumps(name)} = {toml_value(style)}")
+    return "\n".join(lines) + "\n"
 
 
 def render_zsh_colors(cfg: dict) -> str:
@@ -508,6 +591,7 @@ def render_hypr_lua(cfg: dict) -> str:
         "",
         "-- Values exposed for other Hyprland config files.",
         "kuro = {",
+        f"    layout = {lua(h['layout'])},",
         "    apps = {",
         f"        terminal    = {lua(cfg['apps']['terminal'])},",
         f"        fileManager = {lua(cfg['apps']['file_manager'])},",
@@ -542,7 +626,7 @@ def render_hypr_lua(cfg: dict) -> str:
         f"            inactive_border = {lua(hex_rgba(c['inactive_border']))},",
         "        },",
         "        resize_on_border = false,",
-        '        layout = "dwindle",',
+        f"        layout = {lua(h['layout'])},",
         "    },",
         "",
         "    decoration = {",
@@ -585,7 +669,6 @@ def render_hypr_lua(cfg: dict) -> str:
         "",
         f"    animations = {{ enabled = {lua(t['animations'])} }},",
         "    dwindle = { preserve_split = true },",
-        '    master = { new_status = "master" },',
         "})",
         "",
     ]
@@ -635,273 +718,6 @@ def render_kitty_conf(cfg: dict) -> str:
     return "\n".join(lines)
 
 
-def render_emacs_theme(cfg: dict) -> str:
-    """Export the active Kuro theme as an Emacs theme matching Bobamacs."""
-    c = cfg["colors"]
-    p = c["palette"]
-
-    bg = c["base"]
-    fg = c["ink"]
-    bg_alt = c.get("tab_inactive_background") or p[0]
-    border = c.get("active_border") or c["accent"]
-    border_subtle = c.get("inactive_border") or p[8]
-    if border_subtle.startswith("#") and len(border_subtle) == 9:
-        border_subtle = border_subtle[:7]
-    if border.startswith("#") and len(border) == 9:
-        border = border[:7]
-
-    red = p[1]
-    green = p[2]
-    yellow = p[3]
-    blue = p[4]
-    purple = p[5]
-    cyan = p[6]
-    comment = p[8]
-
-    bright_red = p[9]
-    bright_green = p[10]
-    bright_yellow = p[11]
-    bright_blue = p[12]
-    bright_purple = p[13]
-    bright_cyan = p[14]
-    bright_fg = p[15]
-
-    accent = c["accent"]
-    cursor = c["cursor"]
-    cursor_text = c["cursor_text"]
-    selection = c["selection_background"]
-    selection_fg = c["selection_foreground"]
-    scheme_name = cfg.get("scheme_name", cfg.get("scheme", "Kuro"))
-
-    return f""";;; kuro-theme.el --- Dynamic Kuro theme generated by kurogen -*- lexical-binding: t; -*-
-;;
-;; Generated by kurogen from ~/.config/kuro/kuro.toml.
-;; Scheme: {scheme_name}
-;; Do not edit manually. Changes will be overwritten when Kuro theme changes.
-
-(deftheme kuro
-  "Dynamic Kuro theme matching the system-wide Kuro desktop scheme.")
-
-(let* ((bg            "{bg}")
-       (bg-alt        "{bg_alt}")
-       (fg            "{fg}")
-       (bright-fg     "{bright_fg}")
-       (comment       "{comment}")
-       (accent        "{accent}")
-       (cursor        "{cursor}")
-       (cursor-text   "{cursor_text}")
-       (selection     "{selection}")
-       (selection-fg  "{selection_fg}")
-       (border        "{border}")
-       (border-subtle "{border_subtle}")
-
-       (red           "{red}")
-       (orange        "{yellow}")
-       (yellow        "{yellow}")
-       (green         "{green}")
-       (cyan          "{cyan}")
-       (blue          "{blue}")
-       (purple        "{purple}")
-
-       (bright-red    "{bright_red}")
-       (bright-green  "{bright_green}")
-       (bright-yellow "{bright_yellow}")
-       (bright-blue   "{bright_blue}")
-       (bright-purple "{bright_purple}")
-       (bright-cyan   "{bright_cyan}")
-
-       (current       "{bg_alt}"))
-
-  ;; Semantic variables used by Bobamacs / Atomic Emacs modules
-  (setq frame-background-mode    'dark)
-  (setq theme-color-foreground   fg)
-  (setq theme-color-background   bg)
-  (setq theme-color-highlight    current)
-  (setq theme-color-critical     red)
-  (setq theme-color-salient      accent)
-  (setq theme-color-strong       bright-fg)
-  (setq theme-color-popout       orange)
-  (setq theme-color-subtle       bg-alt)
-  (setq theme-color-faded        comment)
-  (setq theme-color-modeline-bg  bg-alt)
-  (setq theme-var "kuro")
-
-  (custom-theme-set-faces
-   'kuro
-
-   ;; Base faces
-   `(default ((t (:foreground ,fg :background ,bg))))
-   `(cursor ((t (:background ,cursor :foreground ,cursor-text))))
-   `(fringe ((t (:background ,bg :foreground ,comment))))
-   `(border ((t (:foreground ,border))))
-   `(window-divider ((t (:foreground ,border-subtle :background ,bg))))
-   `(vertical-border ((t (:foreground ,border-subtle))))
-   `(shadow ((t (:foreground ,comment))))
-   `(highlight ((t (:background ,bg-alt))))
-   `(hl-line ((t (:background ,current))))
-   `(region ((t (:background ,selection :foreground ,selection-fg))))
-   `(secondary-selection ((t (:background ,bg-alt))))
-
-   ;; Line numbers
-   `(line-number ((t (:foreground ,comment :background ,bg))))
-   `(line-number-current-line ((t (:foreground ,accent :background ,bg :weight bold))))
-
-   ;; Minibuffer & Search
-   `(minibuffer-prompt ((t (:foreground ,accent :weight bold))))
-   `(link ((t (:foreground ,cyan :underline t))))
-   `(link-visited ((t (:foreground ,purple :underline t))))
-   `(isearch ((t (:background ,orange :foreground ,bg :weight bold))))
-   `(lazy-highlight ((t (:background ,bg-alt :foreground ,fg))))
-   `(match ((t (:background ,bg-alt :foreground ,accent))))
-
-   ;; Parentheses & Delimiters
-   `(show-paren-match ((t (:background ,bg-alt :foreground ,accent :weight bold))))
-   `(show-paren-mismatch ((t (:background ,red :foreground ,bg :weight bold))))
-
-   ;; Mode line & Header line
-   `(mode-line ((t (:background ,bg-alt :foreground ,fg :height 0.1 :box nil))))
-   `(mode-line-inactive ((t (:background ,bg-alt :foreground ,comment :height 0.1 :box nil))))
-   `(modeline-active ((t (:background ,bg-alt :foreground ,fg :box (:line-width 1 :color ,bg-alt :style nil)))))
-   `(modeline-inactive ((t (:background ,bg-alt :foreground ,comment :box (:line-width 1 :color ,bg-alt :style nil)))))
-   `(modeline-status ((t (:foreground ,bg :background ,accent :weight bold))))
-   `(header-line ((t (:background ,bg-alt :foreground ,fg :overline nil :underline nil :box (:line-width 4 :color ,bg-alt :style nil) :inherit nil))))
-
-   ;; Font Lock / Syntax Highlighting
-   `(font-lock-comment-face ((t (:foreground ,comment :slant italic))))
-   `(font-lock-comment-delimiter-face ((t (:foreground ,comment :slant italic))))
-   `(font-lock-doc-face ((t (:foreground ,comment))))
-   `(font-lock-string-face ((t (:foreground ,green))))
-   `(font-lock-constant-face ((t (:foreground ,purple))))
-   `(font-lock-warning-face ((t (:foreground ,red :weight bold))))
-   `(font-lock-function-name-face ((t (:foreground ,blue :weight medium))))
-   `(font-lock-variable-name-face ((t (:foreground ,fg))))
-   `(font-lock-builtin-face ((t (:foreground ,cyan))))
-   `(font-lock-type-face ((t (:foreground ,yellow))))
-   `(font-lock-keyword-face ((t (:foreground ,purple :weight semi-bold))))
-   `(font-lock-preprocessor-face ((t (:foreground ,purple))))
-   `(font-lock-escape-face ((t (:foreground ,orange))))
-   `(font-lock-number-face ((t (:foreground ,orange))))
-   `(font-lock-operator-face ((t (:foreground ,fg))))
-   `(font-lock-property-name-face ((t (:foreground ,fg))))
-
-   ;; Bobamacs Semantic Faces
-   `(theme-face-default ((t (:foreground ,fg :background ,bg))))
-   `(theme-face-variable-pitch ((t (:foreground ,fg :background ,bg))))
-   `(theme-face-strong ((t (:foreground ,bright-fg :weight medium))))
-   `(theme-face-faded ((t (:foreground ,comment))))
-   `(theme-face-subtle ((t (:foreground ,fg :background ,bg-alt))))
-   `(theme-face-salient ((t (:foreground ,accent))))
-   `(theme-face-popout ((t (:foreground ,yellow))))
-   `(theme-face-critical ((t (:foreground ,red))))
-
-   ;; Diagnostics & Alerts
-   `(success ((t (:foreground ,green))))
-   `(warning ((t (:foreground ,yellow))))
-   `(error ((t (:foreground ,red :weight bold))))
-   `(button ((t (:foreground ,accent :underline nil))))
-
-   ;; Completions
-   `(completions-common-part ((t (:foreground ,accent :weight bold))))
-   `(completions-first-difference ((t (:foreground ,bright-fg))))
-   `(corfu-default ((t (:background ,bg-alt :foreground ,fg))))
-   `(corfu-current ((t (:background ,selection :foreground ,selection-fg))))
-   `(company-tooltip ((t (:background ,bg-alt :foreground ,fg))))
-   `(company-tooltip-selection ((t (:background ,selection :foreground ,selection-fg))))
-   `(vertico-posframe ((t (:background ,bg-alt :foreground ,fg))))
-   `(vertico-posframe-border ((t (:background ,border :foreground ,border))))
-
-   ;; Diff & Git
-   `(diff-added ((t (:foreground ,green))))
-   `(diff-removed ((t (:foreground ,red))))
-   `(diff-changed ((t (:foreground ,yellow))))
-   `(diff-refine-added ((t (:background ,green :foreground ,bg))))
-   `(diff-refine-removed ((t (:background ,red :foreground ,bg))))
-   `(magit-branch-local ((t (:foreground ,accent))))
-   `(magit-branch-remote ((t (:foreground ,green))))
-   `(magit-diff-added ((t (:foreground ,green))))
-   `(magit-diff-removed ((t (:foreground ,red))))
-   `(magit-section-heading ((t (:foreground ,accent :weight bold))))
-
-   ;; Org Mode
-   `(org-document-title ((t (:foreground ,accent :weight bold :height 1.25))))
-   `(org-level-1 ((t (:foreground ,accent :weight bold :height 1.15))))
-   `(org-level-2 ((t (:foreground ,blue :weight bold :height 1.1))))
-   `(org-level-3 ((t (:foreground ,cyan :weight bold :height 1.05))))
-   `(org-level-4 ((t (:foreground ,green :weight bold :height 1.0))))
-   `(org-code ((t (:foreground ,orange :background ,bg-alt))))
-   `(org-verbatim ((t (:foreground ,purple :background ,bg-alt))))
-   `(org-block ((t (:foreground ,fg :background ,bg-alt :extend t))))
-   `(org-block-begin-line ((t (:foreground ,comment :slant italic :extend t))))
-   `(org-block-end-line ((t (:foreground ,comment :slant italic :extend t))))
-   `(org-quote ((t (:background ,bg-alt :slant italic))))
-   `(org-table ((t (:foreground ,fg))))
-   `(org-tag ((t (:foreground ,yellow))))
-   `(org-todo ((t (:foreground ,red :weight bold))))
-   `(org-done ((t (:foreground ,green :weight bold))))
-
-   ;; Markdown
-   `(markdown-header-face-1 ((t (:foreground ,accent :weight bold))))
-   `(markdown-header-face-2 ((t (:foreground ,blue :weight bold))))
-   `(markdown-header-face-3 ((t (:foreground ,cyan :weight bold))))
-   `(markdown-link-face ((t (:foreground ,cyan :underline t))))
-   `(markdown-code-face ((t (:foreground ,orange :background ,bg-alt))))
-   `(markdown-pre-face ((t (:background ,bg-alt))))
-
-   ;; Bobamacs Dashboard
-   `(dashboard-button-face ((t (:foreground ,accent :weight bold :underline nil))))
-   `(dashboard-border-face ((t (:foreground ,border-subtle))))
-   `(dashboard-title-face ((t (:foreground ,accent :weight bold))))
-   `(dashboard-stats-face ((t (:foreground ,comment))))
-   `(dashboard-card-header-face ((t (:foreground ,bright-fg :background ,bg-alt :weight bold))))
-   `(dashboard-separator-face ((t (:foreground ,border-subtle))))
-
-   ;; Terminal ANSI colors inside Emacs
-   `(term-color-black   ((t (:foreground ,bg :background ,bg))))
-   `(term-color-red     ((t (:foreground ,red :background ,red))))
-   `(term-color-green   ((t (:foreground ,green :background ,green))))
-   `(term-color-yellow  ((t (:foreground ,yellow :background ,yellow))))
-   `(term-color-blue    ((t (:foreground ,blue :background ,blue))))
-   `(term-color-magenta ((t (:foreground ,purple :background ,purple))))
-   `(term-color-cyan    ((t (:foreground ,cyan :background ,cyan))))
-   `(term-color-white   ((t (:foreground ,fg :background ,fg))))
-
-   `(ansi-color-black   ((t (:foreground ,bg :background ,bg))))
-   `(ansi-color-red     ((t (:foreground ,red :background ,red))))
-   `(ansi-color-green   ((t (:foreground ,green :background ,green))))
-   `(ansi-color-yellow  ((t (:foreground ,yellow :background ,yellow))))
-   `(ansi-color-blue    ((t (:foreground ,blue :background ,blue))))
-   `(ansi-color-magenta ((t (:foreground ,purple :background ,purple))))
-   `(ansi-color-cyan    ((t (:foreground ,cyan :background ,cyan))))
-   `(ansi-color-white   ((t (:foreground ,fg :background ,fg))))))
-
-;;;###autoload
-(when load-file-name
-  (add-to-list 'custom-theme-load-path
-               (file-name-as-directory (file-name-directory load-file-name))))
-
-(provide-theme 'kuro)
-;;; kuro-theme.el ends here
-"""
-
-
-def reload_emacs() -> None:
-    """Notify any running Emacs instance or daemon to reload the active Kuro theme."""
-    try:
-        subprocess.run(
-            [
-                "emacsclient",
-                "--no-wait",
-                "--eval",
-                "(when (fboundp 'kuro-reload-theme) (kuro-reload-theme))",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=1,
-        )
-    except Exception:
-        pass
-
-
 def generate(cfg: dict) -> list[str]:
     changed = []
     if write_if_changed(THEME_JSON, render_theme_json(cfg)):
@@ -919,8 +735,8 @@ def generate(cfg: dict) -> list[str]:
         changed.append(str(HYPR_LUA))
     if write_if_changed(KITTY_CONF, render_kitty_conf(cfg)):
         changed.append(str(KITTY_CONF))
-    if write_if_changed(EMACS_THEME, render_emacs_theme(cfg)):
-        changed.append(str(EMACS_THEME))
+    if write_if_changed(HELIX_THEME, render_helix_theme(cfg)):
+        changed.append(str(HELIX_THEME))
     return changed
 
 
@@ -1059,8 +875,6 @@ def main(argv: list[str]) -> int:
             print(f"kuro: wrote {path}")
         if not changed:
             print("kuro: configs already up to date")
-        if changed:
-            reload_emacs()
         return 0
     except KuroError as exc:
         print(f"kurogen: {exc}", file=sys.stderr)

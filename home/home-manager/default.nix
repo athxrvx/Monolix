@@ -50,19 +50,13 @@
     type = "Application";
     noDisplay = true;
   };
-  xdg.desktopEntries.nvim = {
-    name = "Neovim";
-    exec = "kitty -e nvim";
+  xdg.desktopEntries.helix = {
+    name = "Helix Editor";
+    genericName = "Text Editor";
+    exec = "kitty -e hx %F";
     type = "Application";
+    categories = [ "Development" "TextEditor" ];
     terminal = false;
-    noDisplay = true;
-  };
-  xdg.desktopEntries.neovim = {
-    name = "Neovim";
-    exec = "kitty -e nvim";
-    type = "Application";
-    terminal = false;
-    noDisplay = true;
   };
   xdg.desktopEntries.ranger = {
     name = "ranger";

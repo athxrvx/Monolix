@@ -6,7 +6,8 @@
     wget
     unzip
 
-    # CLI toolchains and editors used by this setup.
+    # CLI toolchains and the configured editor.
+    helix
     gcc
     gnumake
     pkg-config
@@ -28,6 +29,14 @@
     gopls
     clang-tools
     typescript-language-server
+    bash-language-server
+    vscode-langservers-extracted
+    eslint
+    prettierd
+    stylua
+    nixfmt
+    ruff
+    python3Packages.pytest
     shellcheck
     shfmt
     jq
@@ -36,8 +45,8 @@
   ];
 
   imports = [
+    ../config/development/git.nix
     ../config/development/opencode.nix
-    # ../config/development/emacs/emacs.nix
-    ../config/development/neovim/neovim.nix
+    ../config/development/helix/helix.nix
   ];
 }

@@ -88,6 +88,7 @@ kuro check                     # evaluate the flake without building
 kuro info                      # flake, profile and tool versions
 kuro path                      # detected flake directory
 kuro doctor                    # check the local setup
+kuro-theme-check               # validate every shipped Kuro palette
 kuro clean --keep 5            # keep five Home Manager generations
 kuro system clean --keep 5     # same for system generations
 kuro gc                        # collect unreachable store paths
@@ -113,7 +114,9 @@ Kuro owns appearance end to end:
 
 - **Theme definitions (managed by Nix):** one TOML per scheme in
   `home/home-manager/theme/colors/`, installed read-only to
-  `~/.config/kuro/themes/`. Add a file there to add a theme.
+  `~/.config/kuro/themes/`. Each file implements the full Kuro color contract;
+  run `python3 home/home-manager/theme/colors/check_palettes.py` (or
+  `kuro-theme-check` after activation) before adding or changing a scheme.
 - **Active setting (managed by kurogen):** `~/.config/kuro/kuro.toml` holds
   the selected scheme, Hyprland look, fonts, terminal settings and app
   defaults. `kurogen` seeds the base file on first run, so a fresh account can

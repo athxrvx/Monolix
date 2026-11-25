@@ -10,11 +10,16 @@ return function(apps)
         local selector = workspace.special
             and tostring(workspace.name)
             or "name:" .. tostring(workspace.name)
-        hl.workspace_rule({ workspace = selector, layout = layout })
+        hl.workspace_rule({
+            workspace = selector,
+            layout = layout,
+            animation = layout == "scrolling" and "slidevert" or "slide",
+        })
+        if kuroSyncWorkspaceGestures then kuroSyncWorkspaceGestures(workspace, layout) end
     end
 
     local function cycleWorkspaceLayout()
-        local layouts = { "master", "dwindle", "scrolling" }
+        local layouts = { "dwindle", "scrolling" }
         local workspace = hl.get_active_special_workspace() or hl.get_active_workspace()
         if not workspace then return end
 
@@ -34,7 +39,6 @@ return function(apps)
     hl.bind(mod .. " + SHIFT + Return",    hl.dsp.exec_cmd(apps.terminal))
     hl.bind(mod .. " + A",                 hl.dsp.exec_cmd("qs -c shell ipc call launcher toggle"))
     hl.bind(mod .. " + V",                 hl.dsp.exec_cmd("qs -c shell ipc call launcher enter sys-clipboard"))
-    hl.bind(mod .. " + TAB",               hl.dsp.exec_cmd("qs -c shell ipc call overview toggle"))
     hl.bind(mod .. " + N",                 hl.dsp.exec_cmd("qs -c shell ipc call notifications toggle"))
     hl.bind(mod .. " + SHIFT + Escape",    hl.dsp.exec_cmd("qs -c shell ipc call lock lock"))
     hl.bind(mod .. " + B",                 hl.dsp.exec_cmd("qs -c shell ipc call sidebar toggle"))
@@ -51,7 +55,6 @@ return function(apps)
     hl.bind(mod .. " + SHIFT + P",         hl.dsp.window.pseudo())
     hl.bind(mod .. " + SHIFT + S",         hl.dsp.layout("togglesplit"))
     hl.bind(mod .. " + SHIFT + Space", cycleWorkspaceLayout)
-    hl.bind(mod .. " + I", function() setWorkspaceLayout("master") end)
     hl.bind(mod .. " + O", function() setWorkspaceLayout("dwindle") end)
     hl.bind(mod .. " + P", function() setWorkspaceLayout("scrolling") end)
     hl.bind("Print",                      hl.dsp.exec_cmd("qs -c shell ipc call capture toggle"))
